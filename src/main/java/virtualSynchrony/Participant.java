@@ -100,6 +100,7 @@ public class Participant extends AbstractActorWithTimers {
 	
 	/* -- Actor behaviour ----------------------------------------------------- */
 	
+	
 	protected boolean crashed = false;          // simulates a crash
 	
 	private void onJoinGroupMsg(JoinGroupMsg msg) {
