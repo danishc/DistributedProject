@@ -1,0 +1,39 @@
+cd Desktop/java/introsde_final/LocalAdapterService
+heroku login
+touch .gitignore
+open -a TextEdit .gitignore
+
+git init
+git remote add origin (git link)
+git remote set-url origin (git Link)
+git add .
+git commit -am "make it better"
+heroku create <name optional>
+git push heroku master
+git push -u origin master
+git pull origin master
+heroku open
+
+heroku addons
+heroku addons:create heroku-postgresql
+
+heroic restart
+
+ls -la
+git status
+git remote -v
+rm -rf .git
+heroku config
+
+
+.gitignore
+/build
+/WebContent/WEB-INF/lib/
+.DS_Store
+*.DS_Store
+.project
+.classpath
+.settings
+/target
+.gradle/
+/bin/
