@@ -4,6 +4,8 @@ import java.io.Serializable;
 import scala.concurrent.duration.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
@@ -17,12 +19,13 @@ public class Participant extends AbstractActor {
 	public int getId() {
 		return id;
 	}
-
+	
+	private static Object LOCK = new Object();
 	private List<ActorRef> group;
+	private List<ActorRef> newGroup;			//used for view change flush participants
 	private Random rnd = new Random();
 	private int sendCount = 0;
 	final static int N_MESSAGES = 1;
-
 	final static int VOTE_TIMEOUT = 1000;      // timeout for the votes, ms
 	
 	// a buffer storing all received chat messages
@@ -103,7 +106,6 @@ public class Participant extends AbstractActor {
 	    ChatMsg m1 = new ChatMsg(n,this.id, true, false);
 	    // wait for normal message multicast to complete
 	    if(multicast(m)) {
-	    	//Thread.sleep(100);
 	    	multicast(m1); //multicast stable message
 	    }
 	}
@@ -161,17 +163,24 @@ public class Participant extends AbstractActor {
 			//set timeout, if timeout occurs it will call crashDetected method 
 			setTimeout(VOTE_TIMEOUT,m.senderId);
 		}
+		//if msg is of flush type
 		else if(m.isFlush) { 
-			
+			this.newGroup.add(this.group.get(m.senderId));
 		}
 		// for stable messages
 		else if(m.isStable){
 			//removing stable msg from buffer
-			for (ChatMsg tmp : this.buffer) {
-				if(m.senderId==tmp.senderId) {
-					this.buffer.remove(tmp);
-				}
+			for (Iterator<ChatMsg> iterator = this.buffer.iterator(); iterator.hasNext(); ) {
+				ChatMsg value = iterator.next();
+			    if (m.senderId==value.senderId) {
+			        iterator.remove();
+			    }
 			}
+//			for (ChatMsg tmp : this.buffer) {
+//				if(m.senderId==tmp.senderId) {
+//					this.buffer.remove(tmp);
+//				}
+//			}
 			appendToHistory(m);
 		}
 	    
@@ -196,7 +205,7 @@ public class Participant extends AbstractActor {
     			 
 	}
 	
-	private void onViewChange(ViewChange msg) {
+	private void onViewChange(ViewChange list) {					/* View changed*/
 		//TODO 1) stop all multicast
 		// 2) multicast all unsatble msgs
 		if(!this.buffer.isEmpty()) {
@@ -209,15 +218,45 @@ public class Participant extends AbstractActor {
 		ChatMsg m= new ChatMsg(100,this.id,false,true);
 		multicast(m);
 		// 4) wait for flush from every one in new view
-		
+		newGroup= new ArrayList<>();
+		try {
+			synchronized(LOCK){
+				while(!allFlush(list.group)){
+					LOCK.wait();	
+				}
+			}
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 		// 5) install the view
+		this.group=list.group;
 	}
 	
+	//check whether all the active participants have send the flush msg
+	private boolean allFlush(List<ActorRef> group) {
+		return new HashSet<>(group).equals(new HashSet<>(this.newGroup));
+	}
+	
+	@Override
+	public Receive createReceive() {
+		return receiveBuilder()
+				.match(JoinGroupMsg.class, this::onJoinGroupMsg)
+				.match(PrintHistoryMsg.class, this::printHistory)
+				.match(ChatMsg.class,         this::onChatMsg)
+				.match(StartChatMsg.class,    this::onStartChatMsg)
+				.match(Timeout.class, this::onTimeout)
+				.match(ViewChange.class, this::onViewChange)
+				.match(ParticipantCrashed.class, this::onParticipantCrashed)
+				.build();
+	}
+	
+	/* -- GM behaviour ----------------------------------------------------- */
 	private void onParticipantCrashed(ParticipantCrashed msg) {
 		if(group.get(msg.crashid) != null ) {
 			group.remove(msg.crashid);
 			ViewChange update = new ViewChange(group);
 			int i=0;
+			//TODO change this while loop
 			while(i<group.size()) {
 				i++;
 				group.get(i).tell(update, null);
@@ -232,14 +271,4 @@ public class Participant extends AbstractActor {
 		
 	}
 	
-	@Override
-	public Receive createReceive() {
-		return receiveBuilder()
-				.match(JoinGroupMsg.class, this::onJoinGroupMsg)
-				.match(PrintHistoryMsg.class, this::printHistory)
-				.match(ChatMsg.class,         this::onChatMsg)
-				.match(StartChatMsg.class,    this::onStartChatMsg)
-				.match(Timeout.class, this::onTimeout)
-				.build();
-	}
 }
