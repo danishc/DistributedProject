@@ -188,12 +188,10 @@ public class Participant extends AbstractActor {
     }
     private void onTimeout(Timeout msg) {                           /* Timeout */
 	      //if (crashed) return;
-    	// TODO sender identified by sender-id is crashed.
-    	// 1) check whether crashed actor is in the current view, if not it means its a duplicate crash detection 
-    	// 2) remove the crashed actor from group.
-    	// 3) GM send new view install to every one in group except the crashed actor.
-    	// 4)
-    	// send the group member list to everyone in the group 
+    	// TODO sender identified by sender-id is crashed. 
+    	// 1) send the group member list to everyone in the group
+    	
+    	// Tell GM to remove the crashed Participant
     	group.get(0).tell(new ParticipantCrashed(msg.senderid), null);
     			 
 	}
@@ -225,6 +223,10 @@ public class Participant extends AbstractActor {
 				group.get(i).tell(update, null);
 			}
 			
+		}
+		
+		else {
+			return;
 		}
 		
 		
