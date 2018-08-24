@@ -2,8 +2,6 @@ package virtualSynchrony;
 
 import java.io.Serializable;
 import scala.concurrent.duration.Duration;
-import virtualSynchrony.Participant.JoinGroupMsg;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -11,13 +9,16 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 import akka.actor.AbstractActor;
-import akka.actor.AbstractActorWithTimers;
 import akka.actor.ActorRef;
 import akka.actor.Props;
 
-public class Participant extends AbstractActorWithTimers {
+public class Participant extends AbstractActor {
 	
 	private final int id;
+	public int getId() {
+		return id;
+	}
+
 	private List<ActorRef> group;
 	private Random rnd = new Random();
 	private int sendCount = 0;
@@ -84,7 +85,15 @@ public class Participant extends AbstractActorWithTimers {
 		}
 	}
 	
-	private void sendChatMsg(int n) throws InterruptedException {
+	public static class ParticipantCrashed implements Serializable {
+		public final int crashid;
+
+		public ParticipantCrashed(int crashid) {
+			this.crashid = crashid;
+		}
+	}
+	
+	private void sendChatMsg(int n)  {
 	    sendCount++; //number of messages broadcast
 	    
 	    ChatMsg m = new ChatMsg(n,this.id, false);
@@ -106,10 +115,10 @@ public class Participant extends AbstractActorWithTimers {
 	private void onJoinGroupMsg(JoinGroupMsg msg) {
 		this.group = msg.group;
 	}
-	private void onStartChatMsg(StartChatMsg msg) throws InterruptedException {
+	private void onStartChatMsg(StartChatMsg msg) {
 	    sendChatMsg(0); // start topic with message 0
 	  }
-	private void onChatMsg(ChatMsg msg) throws InterruptedException {
+	private void onChatMsg(ChatMsg msg)  {
 		deliver(msg);  // "deliver" the message to the simulated chat user
 	}
 	
@@ -143,7 +152,7 @@ public class Participant extends AbstractActorWithTimers {
 	   return true;
 	}
 
-	private void deliver(ChatMsg m) throws InterruptedException {
+	private void deliver(ChatMsg m)  {
 		// for unstable messages
 		if(!m.isStable) {
 			this.buffer.add(m);
@@ -175,23 +184,14 @@ public class Participant extends AbstractActorWithTimers {
     }
     private void onTimeout(Timeout msg) {                           /* Timeout */
 	      //if (crashed) return;
-	      crashDetected(msg.senderid);
-	      
-	    }
-	private void crashDetected(int senderid) {
-		// TODO sender identified by sender-id is crashed.
-		// 1) check whether crashed actor is in the current view, if not it means its a duplicate crash detection 
-		// 2) remove the crashed actor from group.
-		// 3) GM send new view install to every one in group except the crashed actor.
-		// 4)
-		// send the group member list to everyone in the group 
-		ViewChange update = new ViewChange(group);
-		int i=0;
-		while(i<group.size()) {
-			i++;
-			group.get(i).tell(update, null);
-		}
-		
+    	// TODO sender identified by sender-id is crashed.
+    	// 1) check whether crashed actor is in the current view, if not it means its a duplicate crash detection 
+    	// 2) remove the crashed actor from group.
+    	// 3) GM send new view install to every one in group except the crashed actor.
+    	// 4)
+    	// send the group member list to everyone in the group 
+    	group.get(0).tell(new ParticipantCrashed(msg.senderid), null);
+    			 
 	}
 	
 	private void onViewChange(ViewChange msg) {
@@ -201,6 +201,21 @@ public class Participant extends AbstractActorWithTimers {
 		// 3) send flush to every one
 		// 4) wait for flush from every one in new view
 		// 5) install the view
+	}
+	
+	private void onParticipantCrashed(ParticipantCrashed msg) {
+		if(group.get(msg.crashid) != null ) {
+			group.remove(msg.crashid);
+			ViewChange update = new ViewChange(group);
+			int i=0;
+			while(i<group.size()) {
+				i++;
+				group.get(i).tell(update, null);
+			}
+			
+		}
+		
+		
 	}
 	
 	@Override
