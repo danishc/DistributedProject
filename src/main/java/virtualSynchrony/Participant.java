@@ -59,11 +59,13 @@ public class Participant extends AbstractActor {
 		    public final int n;          // the number of the reply in the current topic
 		    public final int senderId;   // the ID of the message sender
 		    public final boolean isStable;
-		    public ChatMsg(int n,int senderId, boolean isStable) {
+		    public final boolean isFlush;
+		    public ChatMsg(int n,int senderId, boolean isStable, boolean isFlush) {
 		     
 		      this.n = n;
 		      this.senderId = senderId;
 		      this.isStable = isStable;
+		      this.isFlush = isFlush;
 		      
 		    }
 		    
@@ -95,10 +97,10 @@ public class Participant extends AbstractActor {
 	private void sendChatMsg(int n)  {
 	    sendCount++; //number of messages broadcast
 	    
-	    ChatMsg m = new ChatMsg(n,this.id, false);
+	    ChatMsg m = new ChatMsg(n,this.id, false, false);
 	    chatHistory.append(m.senderId+":"+m.n + "m ");
 	    
-	    ChatMsg m1 = new ChatMsg(n,this.id, true);
+	    ChatMsg m1 = new ChatMsg(n,this.id, true, false);
 	    // wait for normal message multicast to complete
 	    if(multicast(m)) {
 	    	//Thread.sleep(100);
@@ -159,8 +161,11 @@ public class Participant extends AbstractActor {
 			//set timeout, if timeout occurs it will call crashDetected method 
 			setTimeout(VOTE_TIMEOUT,m.senderId);
 		}
+		else if(m.isFlush) { 
+			
+		}
 		// for stable messages
-		else {
+		else if(m.isStable){
 			//removing stable msg from buffer
 			for (ChatMsg tmp : this.buffer) {
 				if(m.senderId==tmp.senderId) {
@@ -194,11 +199,19 @@ public class Participant extends AbstractActor {
 	}
 	
 	private void onViewChange(ViewChange msg) {
-		//TODO 
-		// 1) stop all multicast
+		//TODO 1) stop all multicast
 		// 2) multicast all unsatble msgs
+		if(!this.buffer.isEmpty()) {
+			for(ChatMsg tmp : this.buffer) {
+			    chatHistory.append(tmp.senderId+":"+tmp.n + "m ");
+			    multicast(tmp);
+			}
+		}
 		// 3) send flush to every one
+		ChatMsg m= new ChatMsg(100,this.id,false,true);
+		multicast(m);
 		// 4) wait for flush from every one in new view
+		
 		// 5) install the view
 	}
 	
