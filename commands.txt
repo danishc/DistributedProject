@@ -6,6 +6,7 @@ open -a TextEdit .gitignore
 git init
 git remote add origin (git link)
 git remote set-url origin (git Link)
+git clone <git-url>
 git add .
 git commit -am "make it better"
 heroku create <name optional>
