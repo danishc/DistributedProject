@@ -108,8 +108,8 @@ public class Participant extends AbstractActor {
 	    System.out.println("multicasting unstable msg by "+ m.senderId);
 	    if(multicast(m)) {
 	    	//multicast stable message
-	    	//System.out.println("multicasting stable msg by "+ m.senderId);
-	    	//multicast(m1);
+	    	System.out.println("multicasting stable msg by "+ m.senderId);
+	    	multicast(m1);
 	    }
 	}
 	
