@@ -42,7 +42,7 @@ public class VSMain {
 	    //    group.get(i).tell(new StartChatMsg(), null);
 	    //}
 	    group.get(1).tell(new StartChatMsg(), null);
-	    group.get(2).tell(new StartChatMsg(), null);
+	    //group.get(2).tell(new StartChatMsg(), null);
 
 	    try {
 	        System.out.println(">>> Wait for the chats to stop and press ENTER <<<");

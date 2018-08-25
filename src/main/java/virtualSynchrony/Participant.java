@@ -105,8 +105,11 @@ public class Participant extends AbstractActor {
 	    
 	    ChatMsg m1 = new ChatMsg(n,this.id, true, false);
 	    // wait for normal message multicast to complete
+	    System.out.println("multicasting unstable msg by "+ m.senderId);
 	    if(multicast(m)) {
-	    	multicast(m1); //multicast stable message
+	    	//multicast stable message
+	    	//System.out.println("multicasting stable msg by "+ m.senderId);
+	    	//multicast(m1);
 	    }
 	}
 	
@@ -139,6 +142,7 @@ public class Participant extends AbstractActor {
 	  }
 	
 	private boolean multicast(Serializable m) { // our multicast implementation
+		
        List<ActorRef> shuffledGroup = new ArrayList<>(group);
 	   Collections.shuffle(shuffledGroup);
 	   for (ActorRef p: shuffledGroup) {
@@ -162,13 +166,22 @@ public class Participant extends AbstractActor {
 			appendToHistory(m);
 			//set timeout, if timeout occurs it will call crashDetected method 
 			setTimeout(VOTE_TIMEOUT,m.senderId);
+			System.out.println("unstable");
 		}
 		//if msg is of flush type
 		else if(m.isFlush) { 
+			System.out.println("flush");
 			this.newGroup.add(this.group.get(m.senderId));
+			for (Iterator<ChatMsg> iterator = this.buffer.iterator(); iterator.hasNext(); ) {
+				ChatMsg value = iterator.next();
+			    if (m.n==value.senderId) {
+			        iterator.remove();
+			    }
+			}
 		}
 		// for stable messages
 		else if(m.isStable){
+			System.out.println("stable");
 			//removing stable msg from buffer
 			for (Iterator<ChatMsg> iterator = this.buffer.iterator(); iterator.hasNext(); ) {
 				ChatMsg value = iterator.next();
@@ -176,11 +189,6 @@ public class Participant extends AbstractActor {
 			        iterator.remove();
 			    }
 			}
-//			for (ChatMsg tmp : this.buffer) {
-//				if(m.senderId==tmp.senderId) {
-//					this.buffer.remove(tmp);
-//				}
-//			}
 			appendToHistory(m);
 		}
 	    
@@ -196,27 +204,43 @@ public class Participant extends AbstractActor {
           );
     }
     private void onTimeout(Timeout msg) {                           /* Timeout */
-	      //if (crashed) return;
-    	// TODO sender identified by sender-id is crashed. 
-    	// 1) send the group member list to everyone in the group
+    	boolean stable= true;
     	
-    	// Tell GM to remove the crashed Participant
-    	group.get(0).tell(new ParticipantCrashed(msg.senderid), null);
+    	//check if participant received stable msg
+    	if(!this.buffer.isEmpty()) {
+    		for(ChatMsg p: this.buffer) {
+    			if(p.senderId==msg.senderid) {
+    				stable=false;
+    			}
+    		}
+    	}
+    	
+    	//if stable msg is not received, tell GM to install new view
+    	if(!stable) {
+    		// Tell GM to remove the crashed Participant
+    		System.out.println("stable not recived " + msg.senderid);
+        	group.get(0).tell(new ParticipantCrashed(msg.senderid), null);
+    	}
     			 
 	}
 	
 	private void onViewChange(ViewChange list) {					/* View changed*/
 		//TODO 1) stop all multicast
-		// 2) multicast all unsatble msgs
-		if(!this.buffer.isEmpty()) {
+		
+		if(!this.buffer.isEmpty()) {	//check if buffer is not empty mean there is some unstable msg received by current participant.
 			for(ChatMsg tmp : this.buffer) {
 			    chatHistory.append(tmp.senderId+":"+tmp.n + "m ");
-			    multicast(tmp);
+			    
+			    System.out.println("multicasting unstable msg from buffer by "+ tmp.senderId);
+			    multicast(tmp);			// 2) multicast all unstable msgs
+			    
+			    ChatMsg m= new ChatMsg(tmp.senderId,this.id,false,true);
+				System.out.println("multicasting flush msg by "+ this.id);
+				multicast(m);			// 3) multicast flush to every one
 			}
 		}
-		// 3) send flush to every one
-		ChatMsg m= new ChatMsg(100,this.id,false,true);
-		multicast(m);
+		
+		
 		// 4) wait for flush from every one in new view
 		newGroup= new ArrayList<>();
 		try {
@@ -252,16 +276,23 @@ public class Participant extends AbstractActor {
 	
 	/* -- GM behaviour ----------------------------------------------------- */
 	private void onParticipantCrashed(ParticipantCrashed msg) {
+		System.out.println(group.get(msg.crashid).path().name());
 		if(group.get(msg.crashid) != null ) {
+			//removing crashed participant from the group
 			group.remove(msg.crashid);
 			ViewChange update = new ViewChange(group);
-			int i=0;
-			//TODO change this while loop
-			while(i<group.size()) {
-				i++;
-				group.get(i).tell(update, null);
+			//tell every one to update the group list and install new view
+			for(ActorRef p:group) {
+				if (!p.equals(getSelf())) { // not sending to self
+					   p.tell(update, null);
+				}
 			}
-			
+//			for (Iterator<ActorRef> iterator = this.group.iterator(); iterator.hasNext(); ) {
+//				ActorRef value = iterator.next();
+//			    if (m.senderId==value.) {
+//			        iterator.remove();
+//			    }
+//			}
 		}
 		
 		else {
