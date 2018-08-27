@@ -4,7 +4,6 @@ import java.io.Serializable;
 import scala.concurrent.duration.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
@@ -80,6 +79,14 @@ public class Participant extends AbstractActor {
 		public Timeout(int senderid) {
 			this.senderid=senderid;
 		}}
+	
+	public static class FlushTimeout implements Serializable {
+		private final List<ActorRef> group;
+
+		public FlushTimeout(List<ActorRef> group) {
+			this.group = group;
+		}
+	}
 	
 	public static class ViewChange implements Serializable {
 		private final List<ActorRef> group;
@@ -220,6 +227,10 @@ public class Participant extends AbstractActor {
     	}
     			 
 	}
+    
+    private void onFlushTimeout(FlushTimeout msg) {
+    	this.group = msg.group;
+    }
 	
 	private void onViewChange(ViewChange list) {					/* View changed*/
 		//TODO 1) stop all multicast
@@ -241,7 +252,7 @@ public class Participant extends AbstractActor {
 		
 		
 		// 4) wait for flush from every one in new view
-		try {
+		/*try {
 			synchronized(LOCK){
 				while(!allFlush(list.group)){
 					LOCK.wait();	
@@ -251,15 +262,22 @@ public class Participant extends AbstractActor {
 			}
 		} catch (InterruptedException e) {
 			e.printStackTrace();
-		}
+		}*/
+		getContext().system().scheduler().scheduleOnce(
+		          Duration.create(6000, TimeUnit.MILLISECONDS),  
+		          getSelf(),
+		          new FlushTimeout(list.group), // the message to send
+		          getContext().system().dispatcher(), getSelf()
+		          );
+		
 		// 5) install the view
 		
 	}
 	
 	//check whether all the active participants have send the flush msg
-	private boolean allFlush(List<ActorRef> group) {
+	/*private boolean allFlush(List<ActorRef> group) {
 		return new HashSet<>(group).equals(new HashSet<>(this.newGroup));
-	}
+	}*/
 	
 	@Override
 	public Receive createReceive() {
