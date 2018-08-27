@@ -52,7 +52,7 @@ public class VSMain {
 	        for (ActorRef peer: group) {
 	        	peer.tell(msg, null);
 	        }
-	        //System.out.println(">>> Press ENTER to exit <<<");
+	        System.out.println(">>> Press ENTER to exit <<<");
 	        System.in.read();
 	      } 
 	      catch (IOException ioe) {}

@@ -105,7 +105,7 @@ public class Participant extends AbstractActor {
 	    
 	    ChatMsg m1 = new ChatMsg(n,this.id, true, false);
 	    // wait for normal message multicast to complete
-	    System.out.println("multicasting unstable msg by "+ m.senderId);
+	    System.out.println(getSelf().path().name()+": multicasting unstable msg by "+ m.senderId);
 	    if(multicast(m)) {
 	    	//multicast stable message
 	    	System.out.println("multicasting stable msg by "+ m.senderId);
@@ -166,7 +166,7 @@ public class Participant extends AbstractActor {
 			appendToHistory(m);
 			//set timeout, if timeout occurs it will call crashDetected method 
 			setTimeout(VOTE_TIMEOUT,m.senderId);
-			System.out.println("unstable");
+			System.out.println(getSelf().path().name()+": sender " + m.senderId +": unstable msg recived");
 		}
 		//if msg is of flush type
 		else if(m.isFlush) { 
@@ -180,8 +180,9 @@ public class Participant extends AbstractActor {
 			}
 		}
 		// for stable messages
-		else if(m.isStable){
-			System.out.println("stable");
+		else if(m.isStable && !group.get(3).equals(getSelf())) //stable msg is not received to 3rd participant
+			{
+			System.out.println(getSelf().path().name()+": sender " + m.senderId +": stable msg recived");
 			//removing stable msg from buffer
 			for (Iterator<ChatMsg> iterator = this.buffer.iterator(); iterator.hasNext(); ) {
 				ChatMsg value = iterator.next();
@@ -218,7 +219,7 @@ public class Participant extends AbstractActor {
     	//if stable msg is not received, tell GM to install new view
     	if(!stable) {
     		// Tell GM to remove the crashed Participant
-    		System.out.println("stable not recived " + msg.senderid);
+    		System.out.println(getSelf().path().name()+": TIMEOUT: stable not recived from " + msg.senderid);
         	group.get(0).tell(new ParticipantCrashed(msg.senderid), null);
     	}
     			 
@@ -231,10 +232,11 @@ public class Participant extends AbstractActor {
 			for(ChatMsg tmp : this.buffer) {
 			    chatHistory.append(tmp.senderId+":"+tmp.n + "m ");
 			    
-			    System.out.println("multicasting unstable msg from buffer by "+ tmp.senderId);
-			    multicast(tmp);			// 2) multicast all unstable msgs
+			    System.out.println(getSelf().path().name()+": multicasting unstable msg from buffer by "+ tmp.senderId);
+			    ChatMsg m= new ChatMsg(tmp.senderId,tmp.senderId,true,false);
+			    multicast(m);			// 2) multicast all unstable msgs
 			    
-			    ChatMsg m= new ChatMsg(tmp.senderId,this.id,false,true);
+			    m= new ChatMsg(tmp.senderId,this.id,false,true);
 				System.out.println("multicasting flush msg by "+ this.id);
 				multicast(m);			// 3) multicast flush to every one
 			}
@@ -276,7 +278,7 @@ public class Participant extends AbstractActor {
 	
 	/* -- GM behaviour ----------------------------------------------------- */
 	private void onParticipantCrashed(ParticipantCrashed msg) {
-		System.out.println(group.get(msg.crashid).path().name());
+		System.out.println(getSelf().path().name()+": "+group.get(msg.crashid).path().name() + ": crashed: installing new view");
 		if(group.get(msg.crashid) != null ) {
 			//removing crashed participant from the group
 			group.remove(msg.crashid);
