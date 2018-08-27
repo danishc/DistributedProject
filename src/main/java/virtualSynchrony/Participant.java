@@ -246,12 +246,14 @@ public class Participant extends AbstractActor {
 				while(!allFlush(list.group)){
 					LOCK.wait();	
 				}
+				System.out.println("hello");
+				this.group=list.group;
 			}
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
 		// 5) install the view
-		this.group=list.group;
+		
 	}
 	
 	//check whether all the active participants have send the flush msg
