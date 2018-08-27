@@ -22,7 +22,7 @@ public class Participant extends AbstractActor {
 	
 	private static Object LOCK = new Object();
 	private List<ActorRef> group;
-	private List<ActorRef> newGroup;			//used for view change flush participants
+	private List<ActorRef> newGroup = new ArrayList<>();			//used for view change flush participants
 	private Random rnd = new Random();
 	private int sendCount = 0;
 	final static int N_MESSAGES = 1;
@@ -160,8 +160,9 @@ public class Participant extends AbstractActor {
 	}
 
 	private void deliver(ChatMsg m)  {
+		System.out.println(m.senderId);
 		// for unstable messages
-		if(!m.isStable) {
+		if(!m.isStable && !m.isFlush) {
 			this.buffer.add(m);
 			appendToHistory(m);
 			//set timeout, if timeout occurs it will call crashDetected method 
@@ -172,12 +173,7 @@ public class Participant extends AbstractActor {
 		else if(m.isFlush) { 
 			System.out.println("flush");
 			this.newGroup.add(this.group.get(m.senderId));
-			for (Iterator<ChatMsg> iterator = this.buffer.iterator(); iterator.hasNext(); ) {
-				ChatMsg value = iterator.next();
-			    if (m.n==value.senderId) {
-			        iterator.remove();
-			    }
-			}
+			
 		}
 		// for stable messages
 		else if(m.isStable && !group.get(3).equals(getSelf())) //stable msg is not received to 3rd participant
@@ -233,18 +229,18 @@ public class Participant extends AbstractActor {
 			    chatHistory.append(tmp.senderId+":"+tmp.n + "m ");
 			    
 			    System.out.println(getSelf().path().name()+": multicasting unstable msg from buffer by "+ tmp.senderId);
-			    ChatMsg m= new ChatMsg(tmp.senderId,tmp.senderId,true,false);
-			    multicast(m);			// 2) multicast all unstable msgs
+			    ChatMsg m= new ChatMsg(tmp.n,tmp.senderId,true,false);
+			    if(multicast(m)) {			// 2) multicast unstable msg
 			    
-			    m= new ChatMsg(tmp.senderId,this.id,false,true);
-				System.out.println("multicasting flush msg by "+ this.id);
-				multicast(m);			// 3) multicast flush to every one
+			    	m= new ChatMsg(tmp.senderId,this.id,false,true);
+			    	System.out.println("multicasting flush msg by "+ this.id);
+			    	multicast(m);			// 3) multicast flush to every one
+			    }
 			}
 		}
 		
 		
 		// 4) wait for flush from every one in new view
-		newGroup= new ArrayList<>();
 		try {
 			synchronized(LOCK){
 				while(!allFlush(list.group)){
