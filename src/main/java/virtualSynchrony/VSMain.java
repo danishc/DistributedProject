@@ -21,6 +21,7 @@ public class VSMain {
 		final ActorSystem system = ActorSystem.create("helloakka");
 		Scanner scanner = new Scanner(System.in);
 	    String option = null;
+	    
 		
 		// actors list
 		List<ActorRef> group = new ArrayList<>();
