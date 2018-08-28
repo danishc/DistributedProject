@@ -37,12 +37,9 @@ public class VSMain {
 	      peer.tell(join, null);
 	    }
 	    
-	    // tell the particioant to start conversation
-	    //for (int i=1; i<=N_PARTICIPANTS; i++) {
-	    //    group.get(i).tell(new StartChatMsg(), null);
-	    //}
 	    group.get(1).tell(new StartChatMsg(), null);
 	    //group.get(2).tell(new StartChatMsg(), null);
+	    //group.get(index)
 
 	    try {
 	        System.out.println(">>> Wait for the chats to stop and press ENTER <<<");
