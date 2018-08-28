@@ -10,6 +10,8 @@ import akka.actor.ActorSystem;
 import virtualSynchrony.Participant.JoinGroupMsg;
 import virtualSynchrony.Participant.PrintHistoryMsg;
 import virtualSynchrony.Participant.StartChatMsg;
+import virtualSynchrony.Participant.ViewChange;
+import virtualSynchrony.Participant.JoinNewAfterMulticast;
 
 public class VSMain {
 	
@@ -33,30 +35,37 @@ public class VSMain {
 			i++;
 			group.add(system.actorOf(Participant.props(id++), "participant" +i ));
 		}
+		
+		// send the group member list to everyone in the group 
+		JoinGroupMsg join = new JoinGroupMsg(group);
+		for (ActorRef peer: group) {
+			peer.tell(join, null);
+		}
+		
+		
 
 	    ShowMenu();
 	    option = scanner.nextLine();
 
 	    switch(option) {
-	    	case "1" :
-	    		System.out.println("option 1 selected");
-	    		//TODO add new p after multicast
-	    		group.add(system.actorOf(Participant.props(id++), "participant" +i ));
-	    		break;
-	    	default :
-	        	System.out.println("Invalid Option");
-	      }
-	      
-		
-		// send the group member list to everyone in the group 
-		JoinGroupMsg join = new JoinGroupMsg(group);
-	    for (ActorRef peer: group) {
-	      peer.tell(join, null);
+	    case "1" :
+	    	System.out.println("option 1 selected");
+	    	for(int j=1; j<=N_PARTICIPANTS; j++) {
+	    		group.get(j).tell(new StartChatMsg(), null);
+	    	}
+	    	break;
+	    	
+	    case "2" :
+	    	System.out.println("option 2 selected");
+	    	// tell p1 to start chat msg
+	    	group.get(1).tell(new StartChatMsg(), null);
+	    	// tell GM to install new view after unstable msg received
+	    	group.get(0).tell(new JoinNewAfterMulticast(true), null);
+	    	break;
+	    default :
+	        System.out.println("Invalid Option");
 	    }
 	    
-	    group.get(1).tell(new StartChatMsg(), null);
-	    //group.get(2).tell(new StartChatMsg(), null);
-	    //group.get(index)
 
 	    try {
 	        System.out.println(">>> Wait for the chats to stop and press ENTER <<<");
@@ -74,7 +83,8 @@ public class VSMain {
 	  }
 
 	private static void ShowMenu() {
-		System.out.println("1: add new participent after unstable/stable multicast");
+		System.out.println("1: normal multicast");
+		System.out.println("2: add new participent after unstable/stable multicast");
 		System.out.println("SELECT THE OPTION");
 		
 	}
