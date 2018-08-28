@@ -2,8 +2,6 @@ package virtualSynchrony;
 
 import java.io.Serializable;
 import scala.concurrent.duration.Duration;
-import virtualSynchrony.Participant.JoinGroupMsg;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
