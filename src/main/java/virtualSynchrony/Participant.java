@@ -2,6 +2,8 @@ package virtualSynchrony;
 
 import java.io.Serializable;
 import scala.concurrent.duration.Duration;
+import virtualSynchrony.Participant.JoinGroupMsg;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -24,7 +26,8 @@ public class Participant extends AbstractActor {
 	private List<ActorRef> newGroup = new ArrayList<>();			//used for view change flush participants
 	private Random rnd = new Random();
 	private int sendCount = 0;
-	final static int N_MESSAGES = 1;
+	private boolean JoinNewAfterMulticast;
+	final static int N_MESSAGES = 2;
 	final static int VOTE_TIMEOUT = 1000;      // timeout for the votes, ms
 	
 	// a buffer storing all received chat messages
@@ -53,6 +56,13 @@ public class Participant extends AbstractActor {
 	}
 	
 	public static class PrintHistoryMsg implements Serializable {}
+	
+	public static class JoinNewAfterMulticast implements Serializable {
+		private final boolean joinNew;
+		public JoinNewAfterMulticast(boolean joinNew) {
+			this.joinNew = joinNew;
+		}
+	}
 	
 	// A message requesting the peer to start a discussion on his topic
 	public static class StartChatMsg implements Serializable {}
@@ -105,19 +115,23 @@ public class Participant extends AbstractActor {
 	}
 	
 	private void sendChatMsg(int n)  {
-	    sendCount++; //number of messages broadcast
+		//limit the total msg exchangeg to N_MESSAGES
+		while(sendCount<N_MESSAGES) {
+			
+			sendCount++; //number of messages broadcast
+			n++;
+			ChatMsg m = new ChatMsg(n,this.id, false, false);
+			chatHistory.append(m.senderId+":"+m.n + "m ");
 	    
-	    ChatMsg m = new ChatMsg(n,this.id, false, false);
-	    chatHistory.append(m.senderId+":"+m.n + "m ");
 	    
-	    ChatMsg m1 = new ChatMsg(n,this.id, true, false);
-	    // wait for normal message multicast to complete
-	    System.out.println(getSelf().path().name()+": multicasting unstable msg by "+ m.senderId);
-	    if(multicast(m)) {
-	    	//multicast stable message
-	    	System.out.println("multicasting stable msg by "+ m.senderId);
-	    	multicast(m1);
-	    }
+			ChatMsg m1 = new ChatMsg(n,this.id, true, false);
+			// wait for normal message multicast to complete
+			System.out.println(getSelf().path().name()+": multicasting unstable msg by "+ m.senderId);
+			if(multicast(m)) {
+				//multicast stable message
+				multicast(m1);
+			}
+		}
 	}
 	
 	/* -- Actor behaviour ----------------------------------------------------- */
@@ -141,7 +155,7 @@ public class Participant extends AbstractActor {
 	
 	private void appendToHistory(ChatMsg m) {
 		if(!m.isStable) {
-			chatHistory.append(m.senderId+":"+m.n + "n ");
+			chatHistory.append(m.senderId+":"+m.n + "u ");
 		}
 		else {
 			chatHistory.append(m.senderId+":"+m.n + "s ");
@@ -167,7 +181,6 @@ public class Participant extends AbstractActor {
 	}
 
 	private void deliver(ChatMsg m)  {
-		System.out.println(m.senderId);
 		// for unstable messages
 		if(!m.isStable && !m.isFlush) {
 			this.buffer.add(m);
@@ -175,6 +188,21 @@ public class Participant extends AbstractActor {
 			//set timeout, if timeout occurs it will call crashDetected method 
 			setTimeout(VOTE_TIMEOUT,m.senderId);
 			System.out.println(getSelf().path().name()+": sender " + m.senderId +": unstable msg recived");
+			
+			
+			if(getSelf().equals(group.get(0)) && this.JoinNewAfterMulticast) {
+				//creating new participant
+				ActorRef newP= getContext().system().actorOf(Participant.props(group.size()), "participant" +group.size());
+				this.group.add(newP);
+				newP.tell(new JoinGroupMsg(group), null);
+				
+				ViewChange update = new ViewChange(group);
+				//tell every one to update the group list and install new view
+				for(ActorRef p:group) {
+					p.tell(update, null);
+				}
+			}
+			
 		}
 		//if msg is of flush type
 		else if(m.isFlush) { 
@@ -185,11 +213,12 @@ public class Participant extends AbstractActor {
 		// for stable messages
 		else if(m.isStable && !group.get(3).equals(getSelf())) //stable msg is not received to 3rd participant
 			{
-			System.out.println(getSelf().path().name()+": sender " + m.senderId +": stable msg recived");
+			
 			//removing stable msg from buffer
 			for (Iterator<ChatMsg> iterator = this.buffer.iterator(); iterator.hasNext(); ) {
 				ChatMsg value = iterator.next();
 			    if (m.senderId==value.senderId) {
+			    	System.out.println(getSelf().path().name()+": sender " + m.senderId +": stable msg recived");
 			        iterator.remove();
 			    }
 			}
@@ -207,6 +236,7 @@ public class Participant extends AbstractActor {
           getContext().system().dispatcher(), getSelf()
           );
     }
+    
     private void onTimeout(Timeout msg) {                           /* Timeout */
     	boolean stable= true;
     	
@@ -228,10 +258,14 @@ public class Participant extends AbstractActor {
     			 
 	}
     
+    private void onJoinNewAfterMulticast(JoinNewAfterMulticast msg) {
+    	this.JoinNewAfterMulticast= msg.joinNew;
+    }
+
     private void onFlushTimeout(FlushTimeout msg) {
     	this.group = msg.group;
     }
-	
+    
 	private void onViewChange(ViewChange list) {					/* View changed*/
 		//TODO 1) stop all multicast
 		
@@ -243,12 +277,10 @@ public class Participant extends AbstractActor {
 			    ChatMsg m= new ChatMsg(tmp.n,tmp.senderId,true,false);
 			    if(multicast(m)) {			// 2) multicast unstable msg
 			    
-			    	m= new ChatMsg(tmp.senderId,this.id,false,true);
-			    	System.out.println("multicasting flush msg by "+ this.id);
-			    	multicast(m);			// 3) multicast flush to every one
 			    }
 			}
 		}
+
 		
 		
 		// 4) wait for flush from every one in new view
@@ -263,6 +295,14 @@ public class Participant extends AbstractActor {
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}*/
+    	System.out.println("multicasting flush msg by "+ this.id);
+		ChatMsg m= new ChatMsg(0,this.id,false,true);
+    	multicast(m);			// 3) multicast flush to every one
+    	chatHistory.append(m.senderId+":"+m.n + "fm ");
+    
+		
+		
+		// 4) wait for flush from every one in new view
 		getContext().system().scheduler().scheduleOnce(
 		          Duration.create(6000, TimeUnit.MILLISECONDS),  
 		          getSelf(),
@@ -289,6 +329,8 @@ public class Participant extends AbstractActor {
 				.match(Timeout.class, this::onTimeout)
 				.match(ViewChange.class, this::onViewChange)
 				.match(ParticipantCrashed.class, this::onParticipantCrashed)
+				.match(FlushTimeout.class, this::onFlushTimeout)
+				.match(JoinNewAfterMulticast.class, this::onJoinNewAfterMulticast)
 				.build();
 	}
 	
@@ -305,12 +347,6 @@ public class Participant extends AbstractActor {
 					   p.tell(update, null);
 				}
 			}
-//			for (Iterator<ActorRef> iterator = this.group.iterator(); iterator.hasNext(); ) {
-//				ActorRef value = iterator.next();
-//			    if (m.senderId==value.) {
-//			        iterator.remove();
-//			    }
-//			}
 		}
 		
 		else {
