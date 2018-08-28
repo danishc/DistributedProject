@@ -10,6 +10,7 @@ import akka.actor.ActorSystem;
 import virtualSynchrony.Participant.JoinGroupMsg;
 import virtualSynchrony.Participant.PrintHistoryMsg;
 import virtualSynchrony.Participant.StartChatMsg;
+import virtualSynchrony.Participant.ViewChange;
 import virtualSynchrony.Participant.JoinNewAfterMulticast;
 
 public class VSMain {
@@ -19,7 +20,8 @@ public class VSMain {
 	public static void main(String[] args) {
 		final ActorSystem system = ActorSystem.create("helloakka");
 		Scanner scanner = new Scanner(System.in);
-		String option = null;
+	    String option = null;
+	    
 		
 		// actors list
 		List<ActorRef> group = new ArrayList<>();
@@ -37,10 +39,12 @@ public class VSMain {
 		
 		// send the group member list to everyone in the group 
 		JoinGroupMsg join = new JoinGroupMsg(group);
-	    for (ActorRef peer: group) {
-	      peer.tell(join, null);
-	    }
-	    
+		for (ActorRef peer: group) {
+			peer.tell(join, null);
+		}
+		
+		
+
 	    ShowMenu();
 	    option = scanner.nextLine();
 
