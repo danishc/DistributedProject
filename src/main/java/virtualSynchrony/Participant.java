@@ -169,11 +169,14 @@ public class Participant extends AbstractActor {
 	private void deliver(ChatMsg m)  {
 		// for unstable messages
 		if(!m.isStable && !m.isFlush) {
+			
 			this.buffer.add(m);
 			appendToHistory(m);
 			//set timeout, if timeout occurs it will call crashDetected method 
 			setTimeout(VOTE_TIMEOUT,m.senderId);
 			System.out.println(getSelf().path().name()+": sender " + m.senderId +": unstable msg recived");
+			
+			
 		}
 		//if msg is of flush type
 		else if(m.isFlush) { 
