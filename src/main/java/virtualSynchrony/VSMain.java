@@ -3,7 +3,6 @@ package virtualSynchrony;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Scanner;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
@@ -17,8 +16,6 @@ public class VSMain {
 
 	public static void main(String[] args) {
 		final ActorSystem system = ActorSystem.create("helloakka");
-		Scanner scanner = new Scanner(System.in);
-	    String option = null;
 		
 		// actors list
 		List<ActorRef> group = new ArrayList<>();
@@ -33,20 +30,6 @@ public class VSMain {
 			i++;
 			group.add(system.actorOf(Participant.props(id++), "participant" +i ));
 		}
-
-	    ShowMenu();
-	    option = scanner.nextLine();
-
-	    switch(option) {
-	    	case "1" :
-	    		System.out.println("option 1 selected");
-	    		//TODO add new p after multicast
-	    		group.add(system.actorOf(Participant.props(id++), "participant" +i ));
-	    		break;
-	    	default :
-	        	System.out.println("Invalid Option");
-	      }
-	      
 		
 		// send the group member list to everyone in the group 
 		JoinGroupMsg join = new JoinGroupMsg(group);
@@ -54,9 +37,12 @@ public class VSMain {
 	      peer.tell(join, null);
 	    }
 	    
+	    // tell the particioant to start conversation
+	    //for (int i=1; i<=N_PARTICIPANTS; i++) {
+	    //    group.get(i).tell(new StartChatMsg(), null);
+	    //}
 	    group.get(1).tell(new StartChatMsg(), null);
 	    //group.get(2).tell(new StartChatMsg(), null);
-	    //group.get(index)
 
 	    try {
 	        System.out.println(">>> Wait for the chats to stop and press ENTER <<<");
@@ -72,10 +58,4 @@ public class VSMain {
 	      catch (IOException ioe) {}
 	      system.terminate();
 	  }
-
-	private static void ShowMenu() {
-		System.out.println("1: add new participent after unstable/stable multicast");
-		System.out.println("SELECT THE OPTION");
-		
-	}
 }
