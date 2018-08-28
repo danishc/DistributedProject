@@ -16,9 +16,6 @@ import akka.actor.Props;
 public class Participant extends AbstractActor {
 	
 	private final int id;
-	public int getId() {
-		return id;
-	}
 	
 	private static Object LOCK = new Object();
 	private List<ActorRef> group;
@@ -190,6 +187,7 @@ public class Participant extends AbstractActor {
 			
 			
 			if(getSelf().equals(group.get(0)) && this.JoinNewAfterMulticast) {
+				this.JoinNewAfterMulticast=false;
 				//creating new participant
 				ActorRef newP= getContext().system().actorOf(Participant.props(group.size()), "participant" +group.size());
 				this.group.add(newP);
