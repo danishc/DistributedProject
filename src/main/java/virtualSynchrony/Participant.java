@@ -2,6 +2,8 @@ package virtualSynchrony;
 
 import java.io.Serializable;
 import scala.concurrent.duration.Duration;
+import virtualSynchrony.Participant.JoinGroupMsg;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -25,6 +27,8 @@ public class Participant extends AbstractActor {
 	private boolean JoinNewAfterMulticast;
 	final static int N_MESSAGES = 2;
 	final static int VOTE_TIMEOUT = 1000;      // timeout for the votes, ms
+	private int inhibit_sends = 0;
+	private int view = 0;
 	
 	// a buffer storing all received chat messages
 	private StringBuffer chatHistory = new StringBuffer();
@@ -60,6 +64,8 @@ public class Participant extends AbstractActor {
 		}
 	}
 	
+	public static class newJoining implements Serializable {}
+	
 	// A message requesting the peer to start a discussion on his topic
 	public static class StartChatMsg implements Serializable {}
 	
@@ -68,12 +74,14 @@ public class Participant extends AbstractActor {
 		    public final int senderId;   // the ID of the message sender
 		    public final boolean isStable;
 		    public final boolean isFlush;
-		    public ChatMsg(int n,int senderId, boolean isStable, boolean isFlush) {
+		    public final int viewIndex;
+		    public ChatMsg(int n,int senderId, boolean isStable, boolean isFlush, int viewIndex) {
 		     
 		      this.n = n;
 		      this.senderId = senderId;
 		      this.isStable = isStable;
 		      this.isFlush = isFlush;
+		      this.viewIndex = viewIndex;
 		      
 		    }
 		    
@@ -88,17 +96,21 @@ public class Participant extends AbstractActor {
 	
 	public static class FlushTimeout implements Serializable {
 		private final List<ActorRef> group;
+		private final int viewIndex;
 
-		public FlushTimeout(List<ActorRef> group) {
+		public FlushTimeout(List<ActorRef> group, int viewIndex) {
 			this.group = group;
+			this.viewIndex = viewIndex;
 		}
 	}
 	
 	public static class ViewChange implements Serializable {
 		private final List<ActorRef> group;
+		private final int viewIndex;
 
-		public ViewChange(List<ActorRef> group) {
+		public ViewChange(List<ActorRef> group, int viewIndex) {
 			this.group = group;
+			this.viewIndex = viewIndex;
 		}
 	}
 	
@@ -116,10 +128,10 @@ public class Participant extends AbstractActor {
 			
 			sendCount++; //number of messages broadcast
 			n++;
-			ChatMsg m = new ChatMsg(n,this.id, false, false);
+			ChatMsg m = new ChatMsg(n,this.id, false, false, this.view);
 			chatHistory.append(m.senderId+":"+m.n + "m ");
 	    
-			ChatMsg m1 = new ChatMsg(n,this.id, true, false);
+			ChatMsg m1 = new ChatMsg(n,this.id, true, false,this.view);
 			// wait for normal message multicast to complete
 			System.out.println(getSelf().path().name()+": multicasting unstable msg by "+ m.senderId);
 			if(multicast(m)) {
@@ -179,10 +191,32 @@ public class Participant extends AbstractActor {
 		// for unstable messages
 		if(!m.isStable && !m.isFlush) {
 			
-			this.buffer.add(m);
+			if(m.viewIndex > this.view) {
+				this.buffer.add(m);
+			}
+			
+			else if(m.viewIndex==this.view) {
+				
+				boolean duplicate= false;
+		    	
+		    	//check if participant already received message
+		    	if(!this.buffer.isEmpty()) {
+		    		for(ChatMsg p: this.buffer) {
+		    			if(p.senderId==m.senderId && p.n==m.n) {
+		    				duplicate=true;
+		    			}
+		    		}
+		    	}
+				
+		    	if(!duplicate) {
+		    		this.buffer.add(m);
+		    	}
+			}
+			
+			//this.buffer.add(m);
 			appendToHistory(m);
 			//set timeout, if timeout occurs it will call crashDetected method 
-			setTimeout(VOTE_TIMEOUT,m.senderId);
+			//setTimeout(VOTE_TIMEOUT,m.senderId);
 			System.out.println(getSelf().path().name()+": sender " + m.senderId +": unstable msg recived");
 			
 			
@@ -191,9 +225,17 @@ public class Participant extends AbstractActor {
 				//creating new participant
 				ActorRef newP= getContext().system().actorOf(Participant.props(group.size()), "participant" +group.size());
 				this.group.add(newP);
-				newP.tell(new JoinGroupMsg(group), null);
-				
-				ViewChange update = new ViewChange(group);
+				//newP.tell(new JoinGroupMsg(group), null);
+				JoinGroupMsg join = new JoinGroupMsg(this.group);
+				for (ActorRef peer: group) {
+					if(!peer.equals(getSelf())) {
+						peer.tell(join, null);
+					}	
+				}
+				//Update view of new Participant so that not receive unstable msgs
+				//from other participants
+				newP.tell(new newJoining(), null);
+				ViewChange update = new ViewChange(group,this.view+1);
 				//tell every one to update the group list and install new view
 				for(ActorRef p:group) {
 					p.tell(update, null);
@@ -204,7 +246,7 @@ public class Participant extends AbstractActor {
 		}
 		//if msg is of flush type
 		else if(m.isFlush) { 
-			System.out.println(getSelf().path().name()+": flush recived from "+ m.senderId);
+			System.out.println(getSelf().path().name()+": flush received from "+ m.senderId);
 			for(ActorRef p: this.group) {
 				this.newGroup.add(p);
 			}
@@ -266,29 +308,52 @@ public class Participant extends AbstractActor {
     private void onJoinNewAfterMulticast(JoinNewAfterMulticast msg) {
     	this.JoinNewAfterMulticast= msg.joinNew;
     }
+    
+    private void onNewJoining(newJoining msg) {
+    	this.view++;
+    }
 
     private void onFlushTimeout(FlushTimeout msg) {
     	if(!allFlush(msg.group)) {
     		System.out.println("all flush not recived yet");
     	}
+    	//Decrement so to send new msgs
+    	this.inhibit_sends--; 
+    	//Install the view after receiving all flush msgs of same view
+    	this.view = msg.viewIndex; 
     }
     
 	private void onViewChange(ViewChange list) {					/* View changed*/
 		//TODO 1) stop all multicast
-		
+		this.inhibit_sends++;   //To stop sending msgs
 		if(!this.buffer.isEmpty()) {	//check if buffer is not empty mean there is some unstable msg received by current participant.
-			for(ChatMsg tmp : this.buffer) {
+			/*for(ChatMsg tmp : this.buffer) {
 			    chatHistory.append(tmp.senderId+":"+tmp.n + "um ");
 			    
 			    System.out.println(getSelf().path().name()+": multicasting unstable msg from buffer by "+ tmp.senderId);
-			    ChatMsg m= new ChatMsg(tmp.n,tmp.senderId,true,false);
-			    if(multicast(m)) {			// 2) multicast unstable msg
-			    	
-			    }
-			}
+			    if(tmp.viewIndex < list.viewIndex) {
+			    	if(multicast(tmp)) {			// 2) multicast unstable msg
+			    		ChatMsg m = new ChatMsg(tmp.n,tmp.senderId, true, tmp.isFlush, tmp.viewIndex);
+			    		tmp = m;
+				    }
+			    } 
+			}*/
+			
+			//Sending unstable msgs and removing it as said in flush protocol
+			for (Iterator<ChatMsg> iterator = this.buffer.iterator(); iterator.hasNext(); ) {
+				ChatMsg tmp = iterator.next();
+				chatHistory.append(tmp.senderId+":"+tmp.n + "um ");
+			    
+			    System.out.println(getSelf().path().name()+": multicasting unstable msg from buffer by "+ tmp.senderId);
+			    if(tmp.viewIndex < list.viewIndex) {
+			    	if(multicast(tmp)) {			// 2) multicast unstable msg
+			    		iterator.remove();
+				    }
+			    } 
+			}	
 		}
     	System.out.println("multicasting flush msg by "+ this.id);
-		ChatMsg m= new ChatMsg(0,this.id,false,true);
+		ChatMsg m= new ChatMsg(0,this.id,false,true,list.viewIndex);
     	multicast(m);			// 3) multicast flush to every one
     	chatHistory.append(m.senderId+":"+m.n + "fm ");
     
@@ -296,9 +361,9 @@ public class Participant extends AbstractActor {
 		
 		// 4) wait for flush from every one in new view
 		getContext().system().scheduler().scheduleOnce(
-		          Duration.create(3000, TimeUnit.MILLISECONDS),  
+		          Duration.create(6000, TimeUnit.MILLISECONDS),  
 		          getSelf(),
-		          new FlushTimeout(list.group), // the message to send
+		          new FlushTimeout(list.group,list.viewIndex), // the message to send
 		          getContext().system().dispatcher(), getSelf()
 		          );
 		
@@ -331,7 +396,7 @@ public class Participant extends AbstractActor {
 		if(group.contains(msg.crashActor)) {
 			//removing crashed participant from the group
 			group.remove(msg.crashActor);
-			ViewChange update = new ViewChange(group);
+			ViewChange update = new ViewChange(group,this.view+1);
 			//tell every one to update the group list and install new view
 			for(ActorRef p:group) {
 				p.tell(update, null);
