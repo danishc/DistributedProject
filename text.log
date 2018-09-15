@@ -1,0 +1,20 @@
+1: normal multicast
+2: add new participent after P1 stable multicast
+3: crash P1 after stable multicast
+4: crash P1 after unstable multicast
+5: crash P2 after receiving multicast
+6: crash P3 after receiving view change msg
+SELECT THE OPTION
+option 6 selected
+>>> Wait for the chats to stop and press ENTER <<<
+1 install view 1 0,1,4,5,6 2
+0 install view 1 0,1,4,5,6 2
+6 install view 1 0,1,4,5,6 2
+4 install view 1 0,1,4,5,6 2
+5 install view 1 0,1,4,5,6 2
+6 install view 1 0,1,4,5,6 1
+4 install view 1 0,1,4,5,6 1
+0 install view 1 0,1,4,5,6 1
+5 install view 1 0,1,4,5,6 1
+1 install view 1 0,1,4,5,6 1
+>>> Press ENTER to exit <<<
