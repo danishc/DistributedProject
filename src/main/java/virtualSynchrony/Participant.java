@@ -177,10 +177,12 @@ public class Participant extends AbstractActor {
 	
 	private void onJoinGroupMsg(JoinGroupMsg msg) {
 		this.group = msg.group;
+		
 		if(this.view != msg.epoch) {
-			//PrintNewViewMsg(this.group);
+			
 			this.view = msg.epoch;
 		}
+		//PrintNewViewMsg(this.group);
 	}
 
 	private void PrintNewViewMsg(List<ActorRef> group2) {
@@ -318,8 +320,9 @@ public class Participant extends AbstractActor {
 	}
 
     private void onFlushTimeout(FlushTimeout msg) throws InterruptedException {
+    	int groupSizeDiff =msg.group.size()-this.flushGroup.size();
     	//PrintNewViewMsg(this.group);
-    	if(isAllFlush(msg.group)) {
+    	if(groupSizeDiff==0) {
     		//install new view successfully
     		//this.allFlush.cancel(); 		//stop ticker if flush received from all participants
     		this.view=msg.view;
@@ -330,22 +333,32 @@ public class Participant extends AbstractActor {
     		this.buffer.clear();
     	}
     	//after time out if there is still someone who did not send the flush
-    	else if(this.flushGroup.size() < msg.group.size()) {
-    		//PrintNewViewMsg(this.flushGroup);
+    	else if(groupSizeDiff>1) {
+    		System.out.println("error");
+    			
+    	}
+    	else if(groupSizeDiff==1) {
+    		//System.out.println("errrrrrrrrrrrrror");
+    		this.inhibit_sends--;
     		List<ActorRef> tmp= new ArrayList<>();
     		tmp.addAll(msg.group);
     		tmp.removeAll(this.flushGroup);
-    		//tell GM that p crashed
+//    		//tell GM that p crashed
     		if(tmp.size()==1) {
     			//System.out.println(tmp.get(0).path().name()+" crashed in " + this.id);
-    			group.get(0).tell(new ParticipantCrashed(tmp.get(0)), getSelf());
+    			getContext().system().scheduler().scheduleOnce(
+  	      	          Duration.create(2000, TimeUnit.MILLISECONDS),  
+  	      	          getSelf(),
+  	      	          new ParticipantCrashed(tmp.get(0)), // the message to send
+  	      	          getContext().system().dispatcher(), getSelf()
+  	      	          );
+    			//group.get(0).tell(new ParticipantCrashed(tmp.get(0)), getSelf());
     		}
-    		else {
-    			//System.out.println("problem");
-    			//PrintNewViewMsg(this.flushGroup);
-    			//System.out.println("problem-e");
-    		}
-    			
+//    		else {
+//    			//System.out.println("problem");
+//    			//PrintNewViewMsg(this.flushGroup);
+//    			//System.out.println("problem-e");
+//    		}
     	}
     }
     
@@ -374,7 +387,7 @@ public class Participant extends AbstractActor {
 		ChatMsg m= new ChatMsg(0,this.id,false,true,list.view);
     	if(multicast(m,list.group))		{
     		getContext().system().scheduler().scheduleOnce(
-      	          Duration.create(30, TimeUnit.MILLISECONDS),  
+      	          Duration.create(3000, TimeUnit.MILLISECONDS),  
       	          getSelf(),
       	          new FlushTimeout(list.group,list.view+1), // the message to send
       	          getContext().system().dispatcher(), getSelf()
@@ -406,7 +419,7 @@ public class Participant extends AbstractActor {
 	}
 	
 	private boolean isAllFlush(List<ActorRef> group) {
-		return new HashSet<>(group).equals(new HashSet<>(this.flushGroup));
+		return new HashSet<>(this.group).equals(new HashSet<>(this.flushGroup));
 	}
 	
 	@Override
@@ -454,15 +467,21 @@ public class Participant extends AbstractActor {
 			
 			temp.addAll(this.group);
 			temp.add(newP);
-			newP.tell(new JoinGroupMsg(temp,this.view+1), getSelf());
+			newP.tell(new JoinGroupMsg(temp,this.view), getSelf());
 			
 			JoinGroupMsg join = new JoinGroupMsg(temp,this.view);
 			for (ActorRef peer: group) {
 				peer.tell(join, getSelf());
 			}
 			
-			JoinNew update = new JoinNew(temp);
-			getSelf().tell(update, getSelf());
+			//JoinNew update = new JoinNew(temp);
+			//getSelf().tell(update, getSelf());
+			getContext().system().scheduler().scheduleOnce(
+	      	          Duration.create(2000, TimeUnit.MILLISECONDS),  
+	      	          getSelf(),
+	      	          new JoinNew(temp), // the message to send
+	      	          getContext().system().dispatcher(), getSelf()
+	      	          );
 		}
 	}
 	

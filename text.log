@@ -7,13 +7,16 @@
 SELECT THE OPTION
 option 6 selected
 >>> Wait for the chats to stop and press ENTER <<<
-2 install view 1 0,2,4,5,6 1
-4 install view 1 0,2,4,5,6 2
-5 install view 1 0,2,4,5,6 2
-0 install view 1 0,2,4,5,6 2
-6 install view 1 0,2,4,5,6 2
-5 install view 1 0,2,4,5,6 1
-4 install view 1 0,2,4,5,6 1
-0 install view 1 0,2,4,5,6 1
-6 install view 1 0,2,4,5,6 1
+participant3 crashed in 5
+participant3 crashed in 2
+participant3 crashed in 1
+participant3 crashed in 6
+participant3 crashed in 4
+participant3 crashed in 0
+6 install view 1 0,1,2,4,5,6 0
+1 install view 1 0,1,2,4,5,6 0
+0 install view 1 0,1,2,4,5,6 0
+5 install view 1 0,1,2,4,5,6 0
+2 install view 1 0,1,2,4,5,6 0
+4 install view 1 0,1,2,4,5,6 0
 >>> Press ENTER to exit <<<
