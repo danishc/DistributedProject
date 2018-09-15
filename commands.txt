@@ -38,3 +38,7 @@ heroku config
 /target
 .gradle/
 /bin/
+
+
+gradle run
+python3 parse.py text.log
