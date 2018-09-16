@@ -2,16 +2,13 @@ package virtualSynchrony;
 
 import java.io.Serializable;
 import scala.concurrent.duration.Duration;
-import virtualSynchrony.newParticipant.JoinGroupMsg;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
-import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
@@ -26,15 +23,15 @@ public class Participant extends AbstractActor {
 	private Random rnd = new Random();
 	private int sendCount =0;
 	final static int N_MESSAGES = 2;
-	final static int VOTE_TIMEOUT = 2000;      // timeout for the votes, ms
-	//private int epoch =1;
-	private boolean crashAfterReceiveMulticast=false;
-	private boolean crashAfterViewChange=false;
+	final static int VOTE_TIMEOUT = 2000;      					// timeout for the votes, ms
+	private boolean crashAfterReceiveMulticast=false; 			// for condition number 5
+	private boolean crashAfterViewChange=false;					//check for condition number 6
 	private List<ActorRef> flushGroup = new ArrayList<>();
-	
-	// a buffer storing all received chat messages
-	private StringBuffer chatHistory = new StringBuffer();
 	private List<ChatMsg> buffer =new ArrayList<>();
+	protected boolean crashed = false;          				// simulates a crash
+	private Cancellable timerMulticast;							// stop timer when inhabit_sent equal to zero
+	private int inhibit_sends = 0;								//allow multicast only when equal to zero
+	private int view = 0;										// view installed by current actor
 	  
 	
 	/* -- Actor constructor  --------------------------------------------------- */
@@ -130,11 +127,9 @@ public class Participant extends AbstractActor {
 		}}
 	
 	public static class FlushTimeout implements Serializable {
-		private final List<ActorRef> group;
 		private final int view;
 
-		public FlushTimeout(List<ActorRef> group, int view) {
-			this.group = group;
+		public FlushTimeout(int view) {
 			this.view= view;
 		}
 	}
@@ -160,13 +155,6 @@ public class Participant extends AbstractActor {
 	
 	/* -- Actor behaviour ----------------------------------------------------- */
 	
-	
-	protected boolean crashed = false;          // simulates a crash
-	private Cancellable allFlush;
-	private Cancellable timerMulticast;
-	private int inhibit_sends = 0;
-	private int view = 0;
-	
 	private void onCrashAfterReceiveMulticast(CrashAfterReceiveMulticast msg) {
 		this.crashAfterReceiveMulticast = msg.crashAfterReceiveMulticast;
 	}
@@ -183,18 +171,6 @@ public class Participant extends AbstractActor {
 			this.view = msg.epoch;
 		}
 		//PrintNewViewMsg(this.group);
-	}
-
-	private void PrintNewViewMsg(List<ActorRef> group2) {
-		StringBuffer tmp= new StringBuffer();
-		for(ActorRef p: group2) {
-			if(!p.path().name().equals("GM0"))
-				tmp.append(",");
-			tmp.append(p.path().name().replaceAll("\\D+",""));
-		}
-		System.out.println(this.id+ " install view "+this.view+" "+ tmp.toString()+" "+this.inhibit_sends);
-		//System.out.println(" "+this.inhibit_sends);
-		
 	}
 	
 	private void onAllowMulticast(AllowMulticast msg) {
@@ -234,69 +210,6 @@ public class Participant extends AbstractActor {
 	private void onChatMsg(ChatMsg msg)  {
 		deliver(msg);  // "deliver" the message to the simulated chat user
 	}	
-	
-	private boolean multicast(Serializable m, List<ActorRef> g) { // our multicast implementation
-		
-       List<ActorRef> shuffledGroup = new ArrayList<>(g);
-	   Collections.shuffle(shuffledGroup);
-	   for (ActorRef p: shuffledGroup) {
-		   if (!p.equals(getSelf())) { // not sending to self
-			   p.tell(m, getSelf());
-			   try {
-				   Thread.sleep(rnd.nextInt(10));
-			   } 
-			   catch (InterruptedException e) {
-				   e.printStackTrace();
-			   }
-		   }
-	  }
-	   return true;
-	}
-
-	private void deliver(ChatMsg m)  {
-		// for unstable messages
-		if(!m.isStable && !m.isFlush) {
-			
-			this.buffer.add(m);
-			//set timeout, on timeout it will check if stable msg received else it calls crashDetected method 
-			setTimeout(VOTE_TIMEOUT,m.senderId);
-			
-		}
-		//if msg is of flush type
-		else if(m.isFlush) { 
-			//System.out.println(getSelf().path().name()+": flush recived from "+ m.senderId);
-			this.flushGroup.add(getSender());
-			
-			
-			
-		}
-		// for stable messages
-		else if(m.isStable && this.view==m.view){
-			
-			//iterate to unstable messages in buffer 
-			for (Iterator<ChatMsg> iterator = this.buffer.iterator(); iterator.hasNext(); ) {
-				ChatMsg value = iterator.next();
-			    if (m.senderId==value.senderId && m.view==value.view) {
-			    	System.out.println(this.id+" deliver multicast m"+m.n+ " from " + m.senderId + " within " + m.view);
-			        iterator.remove(); //removing stable msg from buffer
-			    }
-			}
-			if(crashAfterReceiveMulticast) {
-				group.get(0).tell(new ParticipantCrashed(getSelf()), null);
-			}
-		}
-	    
-	}
-	
-	// schedule a Timeout message in specified time
-    private void setTimeout(int time,int senderid) {
-      getContext().system().scheduler().scheduleOnce(
-          Duration.create(time, TimeUnit.MILLISECONDS),  
-          getSelf(),
-          new Timeout(senderid), // the message to send
-          getContext().system().dispatcher(), getSelf()
-          );
-    }
     
     private void onTimeout(Timeout msg) {                           /* Timeout */
     	boolean stable= true;
@@ -313,114 +226,135 @@ public class Participant extends AbstractActor {
     	//if stable msg is not received, tell GM to install new view
     	if(!stable) {
     		// Tell GM to remove the crashed Participant
-    		//System.out.println(getSelf().path().name()+": TIMEOUT: stable not recived from " + msg.senderid);
-        	group.get(0).tell(new ParticipantCrashed(group.get(msg.senderid)), null);
+        	group.get(0).tell(new ParticipantCrashed(group.get(msg.senderid)), getSelf());
     	}
     			 
 	}
 
     private void onFlushTimeout(FlushTimeout msg) throws InterruptedException {
-    	int groupSizeDiff =msg.group.size()-this.flushGroup.size();
-    	//PrintNewViewMsg(this.group);
-    	if(groupSizeDiff==0) {
-    		//install new view successfully
-    		//this.allFlush.cancel(); 		//stop ticker if flush received from all participants
+    	int groupSizeDiff =this.group.size()-this.flushGroup.size();
+    	if(isAllFlush(this.group)) {	//install new view successfully
     		this.view=msg.view;
-        	this.inhibit_sends--;
-        	this.group=msg.group;
+        	this.inhibit_sends=0;
     		PrintNewViewMsg(this.group);
     		//Any message that was sent in view and has not yet been delivered may be discarded
     		this.buffer.clear();
     	}
     	//after time out if there is still someone who did not send the flush
-    	else if(groupSizeDiff>1) {
-    		System.out.println("error");
-    			
-    	}
-    	else if(groupSizeDiff==1) {
-    		//System.out.println("errrrrrrrrrrrrror");
-    		this.inhibit_sends--;
+    	else if(groupSizeDiff==1) {	// some one crashed while sending flush
     		List<ActorRef> tmp= new ArrayList<>();
-    		tmp.addAll(msg.group);
+    		tmp.addAll(this.group);
     		tmp.removeAll(this.flushGroup);
-//    		//tell GM that p crashed
+ 		
     		if(tmp.size()==1) {
-    			//System.out.println(tmp.get(0).path().name()+" crashed in " + this.id);
     			getContext().system().scheduler().scheduleOnce(
-  	      	          Duration.create(2000, TimeUnit.MILLISECONDS),  
-  	      	          getSelf(),
+  	      	          Duration.create(1000, TimeUnit.MILLISECONDS),  
+  	      	          getSelf(),	//tell GM that p crashed
   	      	          new ParticipantCrashed(tmp.get(0)), // the message to send
   	      	          getContext().system().dispatcher(), getSelf()
   	      	          );
-    			//group.get(0).tell(new ParticipantCrashed(tmp.get(0)), getSelf());
     		}
-//    		else {
-//    			//System.out.println("problem");
-//    			//PrintNewViewMsg(this.flushGroup);
-//    			//System.out.println("problem-e");
-//    		}
     	}
     }
     
 	private void onViewChange(ViewChange list) {					/* View changed*/
-		if(!crashAfterViewChange) {
-		//1) stop multicast
-		this.inhibit_sends++;
+		if(!crashAfterViewChange) {	// check for condition number 6
+			//1) stop multicast
+			this.inhibit_sends++;
 		
-		//this.view=list.view;
+			if(!this.buffer.isEmpty()) {	//check if buffer is not empty mean there is some unstable msg received by current participant.
+				for(ChatMsg tmp : this.buffer) {
+					// 2) multicast unstable msg
+					ChatMsg m= new ChatMsg(tmp.n,tmp.senderId,true,false,tmp.view);
+					multicast(m,this.group); 			
+			    }
+			}
+			this.flushGroup.clear();
+			this.flushGroup.add(getSelf());
 		
-		if(!this.buffer.isEmpty()) {	//check if buffer is not empty mean there is some unstable msg received by current participant.
-			for(ChatMsg tmp : this.buffer) {
-			    
-			    // 2) multicast unstable msg
-			    ChatMsg m= new ChatMsg(tmp.n,tmp.senderId,true,false,tmp.view);
-			    multicast(m,this.group); 			
-			    
+			// 3) multicast flush to every one
+			ChatMsg m= new ChatMsg(0,this.id,false,true,list.view);
+			if(multicast(m,list.group))		{	//wait for multicast to complete
+				getContext().system().scheduler().scheduleOnce(
+						Duration.create(1000, TimeUnit.MILLISECONDS),  
+						getSelf(),
+						new FlushTimeout(list.view+1), // the message to send
+						getContext().system().dispatcher(), getSelf()
+				);
+    		}
+		}
+	}
+	
+	private void deliver(ChatMsg m)  {
+		// for unstable messages
+		if(!m.isStable && !m.isFlush) {
+			
+			this.buffer.add(m);
+			//set timeout, on timeout it will check if stable msg received else it calls crashDetected method 
+			getContext().system().scheduler().scheduleOnce(
+			          Duration.create(VOTE_TIMEOUT, TimeUnit.MILLISECONDS),  
+			          getSelf(),
+			          new Timeout(m.senderId), // the message to send
+			          getContext().system().dispatcher(), getSelf()
+			          );
+			
+		}
+		
+		else if(m.isFlush) {	//if msg is of flush type
+			this.flushGroup.add(getSender()); // add sender in the flushGroup
+			
+		}
+		// for stable messages
+		else if(m.isStable && this.view==m.view){
+			
+			//iterate to unstable messages in buffer 
+			for (Iterator<ChatMsg> iterator = this.buffer.iterator(); iterator.hasNext(); ) {
+				ChatMsg value = iterator.next();
+			    if (m.senderId==value.senderId && m.view==value.view) {
+			    	System.out.println(this.id+" deliver multicast m"+m.n+ " from " + m.senderId + " within " + m.view);
+			        iterator.remove(); //removing stable msg from buffer
+			    }
+			}
+			if(crashAfterReceiveMulticast) { // for condition number 5
+				group.get(0).tell(new ParticipantCrashed(getSelf()), null);
 			}
 		}
-		this.flushGroup.clear();
-		//this.flushGroup.addAll(list.group);
-		this.flushGroup.add(getSelf());
+	    
+	}
+	
+	private boolean multicast(Serializable m, List<ActorRef> g) { // our multicast implementation
 		
-		
-		// 3) multicast flush to every one
-		ChatMsg m= new ChatMsg(0,this.id,false,true,list.view);
-    	if(multicast(m,list.group))		{
-    		getContext().system().scheduler().scheduleOnce(
-      	          Duration.create(3000, TimeUnit.MILLISECONDS),  
-      	          getSelf(),
-      	          new FlushTimeout(list.group,list.view+1), // the message to send
-      	          getContext().system().dispatcher(), getSelf()
-      	          );
-    	}
-    	// adding my self in the flushGroup to check if all members of epoch send the flush
-    	//this.flushGroup.add(getSelf());
-    	
-    	
-		// 4) wait for flush from every one in new view
-		// 5) install the view
-//    	allFlush =getContext().system().scheduler().schedule(
-//    			Duration.create(3000, TimeUnit.MILLISECONDS),
-//    			Duration.create(5000, TimeUnit.MILLISECONDS),  
-//		        getSelf(),
-//		        new FlushTimeout(list.group), // the message to send
-//		        getContext().system().dispatcher(), getSelf()
-//		        );
-    	
-//    	allFlush =getContext().system().scheduler().scheduleOnce(
-//    	          Duration.create(30000, TimeUnit.MILLISECONDS),  
-//    	          getSelf(),
-//    	          new FlushTimeout(list.group,list.view+1), // the message to send
-//    	          getContext().system().dispatcher(), getSelf()
-//    	          );
-    	
+	       List<ActorRef> shuffledGroup = new ArrayList<>(g);
+		   Collections.shuffle(shuffledGroup);
+		   for (ActorRef p: shuffledGroup) {
+			   if (!p.equals(getSelf())) { // not sending to self
+				   p.tell(m, getSelf());
+				   try {
+					   Thread.sleep(rnd.nextInt(10));
+				   } 
+				   catch (InterruptedException e) {
+					   e.printStackTrace();
+				   }
+			   }
+		  }
+		   return true;
 		}
-    	
+	
+	private void PrintNewViewMsg(List<ActorRef> group2) {
+		StringBuffer tmp= new StringBuffer();
+		for(ActorRef p: group2) {
+			if(!p.path().name().equals("GM0"))
+				tmp.append(",");
+			tmp.append(p.path().name().replaceAll("\\D+",""));
+		}
+		System.out.println(this.id+ " install view "+this.view+" "+ tmp.toString());
+		
 	}
 	
 	private boolean isAllFlush(List<ActorRef> group) {
 		return new HashSet<>(this.group).equals(new HashSet<>(this.flushGroup));
 	}
+
 	
 	@Override
 	public Receive createReceive() {
@@ -440,20 +374,17 @@ public class Participant extends AbstractActor {
 				.build();
 	}
 	
+	
+	
 	/* -- GM behaviour ----------------------------------------------------- */
+	
 	private void onParticipantCrashed(ParticipantCrashed msg) {
 		
-		//System.out.println(getSelf().path().name()+": "+msg.crashActor.path().name() + ": crashed: installing new view");
 		if(group.contains(msg.crashActor) && this.id==0) {
-			
-			//removing crashed participant from the group
-			this.group.remove(msg.crashActor);
-			//PrintNewViewMsg(this.group);
+			this.group.remove(msg.crashActor);	//removing crashed participant from the group
 			ViewChange update = new ViewChange(group,this.view);
-			//System.out.print("/////////////////////////");
-			//PrintNewViewMsg(group);
-			//tell every one to update the group list and install new view
-			for(ActorRef p:this.group) {
+			
+			for(ActorRef p:this.group) {	//tell every one to update the group list and install new view
 				p.tell(update, null);
 			}
 		}
@@ -470,15 +401,13 @@ public class Participant extends AbstractActor {
 			newP.tell(new JoinGroupMsg(temp,this.view), getSelf());
 			
 			JoinGroupMsg join = new JoinGroupMsg(temp,this.view);
-			for (ActorRef peer: group) {
+			for (ActorRef peer: group) {	//tell every one to modify there group list
 				peer.tell(join, getSelf());
 			}
 			
-			//JoinNew update = new JoinNew(temp);
-			//getSelf().tell(update, getSelf());
 			getContext().system().scheduler().scheduleOnce(
-	      	          Duration.create(2000, TimeUnit.MILLISECONDS),  
-	      	          getSelf(),
+	      	          Duration.create(50, TimeUnit.MILLISECONDS),  
+	      	          getSelf(),	//telling GM to install new view
 	      	          new JoinNew(temp), // the message to send
 	      	          getContext().system().dispatcher(), getSelf()
 	      	          );
@@ -487,9 +416,8 @@ public class Participant extends AbstractActor {
 	
 	private void onJoinNew(JoinNew msg) {
 		if(this.id==0) {
-			//PrintNewViewMsg(msg.group);
 			ViewChange update = new ViewChange(msg.group,this.view);
-			//tell every one to update the group list and install new view
+			//tell every one to install new view
 			for(ActorRef p:msg.group) {
 				p.tell(update, null);
 			}

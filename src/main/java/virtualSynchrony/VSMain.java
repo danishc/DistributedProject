@@ -110,13 +110,13 @@ public class VSMain {
 	    	          system.dispatcher(), null
 	    	          );
 	    	
-//	    	sendStable=true;
-//	    	system.scheduler().scheduleOnce(
-//	    	          Duration.create(10000, TimeUnit.MILLISECONDS),  
-//	    	          group.get(1),
-//	    	          new StartChatMsg(sendStable), // the message to send
-//	    	          system.dispatcher(), null
-//	    	          );
+	    	sendStable=true;
+	    	system.scheduler().scheduleOnce(
+	    	          Duration.create(50, TimeUnit.MILLISECONDS),  
+	    	          group.get(1),
+	    	          new StartChatMsg(sendStable), // the message to send
+	    	          system.dispatcher(), null
+	    	          );
 	    	break;
 	    default :
 	        System.out.println("Invalid Option");
