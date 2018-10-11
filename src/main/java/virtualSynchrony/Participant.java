@@ -22,8 +22,7 @@ public class Participant extends AbstractActor {
 	private List<ActorRef> group;
 	private Random rnd = new Random();
 	private int sendCount =0;
-	final static int N_MESSAGES = 2;
-	final static int VOTE_TIMEOUT = 2000;      					// timeout for the votes, ms
+	final static int N_MESSAGES = 2;							// max number of msgs an actor can multicast
 	private boolean crashAfterReceiveMulticast=false; 			// for condition number 5
 	private boolean crashAfterViewChange=false;					//check for condition number 6
 	private List<ActorRef> flushGroup = new ArrayList<>();
@@ -60,13 +59,7 @@ public class Participant extends AbstractActor {
 	
 	public static class CreateNewActor implements Serializable {}
 	
-	public static class JoinNew implements Serializable {
-		private final List<ActorRef> group;
-
-		public JoinNew(List<ActorRef> group) {
-			this.group = group;
-		}
-	}
+	public static class JoinNew implements Serializable {}
 	
 	public static class CrashAfterReceiveMulticast implements Serializable {
 		private final boolean crashAfterReceiveMulticast; 
@@ -135,11 +128,9 @@ public class Participant extends AbstractActor {
 	}
 	
 	public static class ViewChange implements Serializable {
-		private final List<ActorRef> group;
 		private final int view;
 
-		public ViewChange(List<ActorRef> group, int i) {
-			this.group = group;
+		public ViewChange(int i) {
 			this.view = i;
 		}
 	}
@@ -164,7 +155,13 @@ public class Participant extends AbstractActor {
 	}
 	
 	private void onJoinGroupMsg(JoinGroupMsg msg) {
-		this.group = msg.group;
+		if(this.id==0) {
+			this.group = msg.group;
+		}
+		else {
+			this.group = Collections.unmodifiableList(msg.group);
+		}
+		
 		
 		if(this.view != msg.epoch) {
 			
@@ -182,23 +179,24 @@ public class Participant extends AbstractActor {
 	
 	private void onStartChatMsg(StartChatMsg msg) {
 		if(sendCount<N_MESSAGES) {
-			if(this.inhibit_sends==0) {
+			if(this.inhibit_sends==0) { //when inhabit_sends is equal to zero it means we are allowed to multicast a msg
 			
-				sendCount++; //number of messages broadcast
-				ChatMsg m = new ChatMsg(sendCount,this.id, false, false, this.view);
-				ChatMsg m1 = new ChatMsg(sendCount,this.id, true, false, this.view);
+				sendCount++; //number of messages broadcast by a single actor
+				ChatMsg um = new ChatMsg(sendCount,this.id, false, false, this.view); //unstable msg
+				ChatMsg sm = new ChatMsg(sendCount,this.id, true, false, this.view); //stable msg
 			
 				System.out.println(this.id +" send multicast m"+ sendCount + " within " + this.view);
-				if(multicast(m,this.group) && msg.sendStable) {
+				if(multicast(um,this.group) && msg.sendStable) {
 					//multicast stable message
-					multicast(m1,this.group);
+					multicast(sm,this.group);
 				}
 			}
 			else {
-				//wait for inhibit_sends to turn to false
+				System.out.println("inhabit is grater the 1");
+				//wait for inhibit_sends to turn to zero
 				timerMulticast =getContext().system().scheduler().schedule(
-						Duration.create(0, TimeUnit.MILLISECONDS),
-		    			Duration.create(50, TimeUnit.MILLISECONDS),  
+						Duration.create(50, TimeUnit.MILLISECONDS),
+		    			Duration.create(100, TimeUnit.MILLISECONDS),  
 				        getSelf(),
 				        new AllowMulticast(msg.sendStable), // the message to send
 				        getContext().system().dispatcher(), getSelf()
@@ -257,7 +255,7 @@ public class Participant extends AbstractActor {
     	}
     }
     
-	private void onViewChange(ViewChange list) {					/* View changed*/
+	private void onViewChange(ViewChange msg) {					/* View changed*/
 		if(!crashAfterViewChange) {	// check for condition number 6
 			//1) stop multicast
 			this.inhibit_sends++;
@@ -273,12 +271,12 @@ public class Participant extends AbstractActor {
 			this.flushGroup.add(getSelf());
 		
 			// 3) multicast flush to every one
-			ChatMsg m= new ChatMsg(0,this.id,false,true,list.view);
-			if(multicast(m,list.group))		{	//wait for multicast to complete
+			ChatMsg m= new ChatMsg(0,this.id,false,true,msg.view);
+			if(multicast(m,this.group))		{	//wait for multicast to complete
 				getContext().system().scheduler().scheduleOnce(
 						Duration.create(1000, TimeUnit.MILLISECONDS),  
 						getSelf(),
-						new FlushTimeout(list.view+1), // the message to send
+						new FlushTimeout(msg.view+1), // the message to send
 						getContext().system().dispatcher(), getSelf()
 				);
     		}
@@ -292,7 +290,7 @@ public class Participant extends AbstractActor {
 			this.buffer.add(m);
 			//set timeout, on timeout it will check if stable msg received else it calls crashDetected method 
 			getContext().system().scheduler().scheduleOnce(
-			          Duration.create(VOTE_TIMEOUT, TimeUnit.MILLISECONDS),  
+			          Duration.create(200, TimeUnit.MILLISECONDS),  
 			          getSelf(),
 			          new Timeout(m.senderId), // the message to send
 			          getContext().system().dispatcher(), getSelf()
@@ -382,7 +380,7 @@ public class Participant extends AbstractActor {
 		
 		if(group.contains(msg.crashActor) && this.id==0) {
 			this.group.remove(msg.crashActor);	//removing crashed participant from the group
-			ViewChange update = new ViewChange(group,this.view);
+			ViewChange update = new ViewChange(this.view);
 			
 			for(ActorRef p:this.group) {	//tell every one to update the group list and install new view
 				p.tell(update, null);
@@ -390,25 +388,36 @@ public class Participant extends AbstractActor {
 		}
 	}
 	
-	private void onCreateNewActor(CreateNewActor msg) {
-		if(this.id==0) {
+	private void onCreateNewActor(CreateNewActor msg) throws InterruptedException {
+		if(this.id==0) { // make sure that only GM can execute this code
 			//creating new participant
 			ActorRef newP= getContext().system().actorOf(Participant.props(this.group.size()), "participant" +this.group.size());
-			List<ActorRef> temp = new ArrayList<>();
+//			List<ActorRef> temp = new ArrayList<>();
+//			
+//			temp.addAll(this.group);
+//			temp.add(newP);
+//			newP.tell(new JoinGroupMsg(temp,this.view), getSelf());
+//			
+//			//tell every one to modify there group list
+//			JoinGroupMsg join = new JoinGroupMsg(temp,this.view);
+//			for (ActorRef peer: group) {	
+//				peer.tell(join, getSelf());
+//			}
+//			
+//			//telling GM to install new view
+//			getSelf().tell(new JoinNew(temp), getSelf());
+			this.group.add(newP);
+			newP.tell(new JoinGroupMsg(Collections.unmodifiableList(this.group),this.view), getSelf());
 			
-			temp.addAll(this.group);
-			temp.add(newP);
-			newP.tell(new JoinGroupMsg(temp,this.view), getSelf());
+			//telling GM to install new view
+			//getSelf().tell(new JoinNew(this.group), getSelf());
 			
-			JoinGroupMsg join = new JoinGroupMsg(temp,this.view);
-			for (ActorRef peer: group) {	//tell every one to modify there group list
-				peer.tell(join, getSelf());
-			}
 			
+			//using scheduler so new participant can update its group list before receiving view change request
 			getContext().system().scheduler().scheduleOnce(
-	      	          Duration.create(50, TimeUnit.MILLISECONDS),  
-	      	          getSelf(),	//telling GM to install new view
-	      	          new JoinNew(temp), // the message to send
+	      	          Duration.create(100, TimeUnit.MILLISECONDS),  
+	      	          getSelf(),	
+	      	          new JoinNew(), // the message to send
 	      	          getContext().system().dispatcher(), getSelf()
 	      	          );
 		}
@@ -416,9 +425,9 @@ public class Participant extends AbstractActor {
 	
 	private void onJoinNew(JoinNew msg) {
 		if(this.id==0) {
-			ViewChange update = new ViewChange(msg.group,this.view);
+			ViewChange update = new ViewChange(this.view);
 			//tell every one to install new view
-			for(ActorRef p:msg.group) {
+			for(ActorRef p:this.group) {
 				p.tell(update, null);
 			}
 		}

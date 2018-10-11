@@ -2,6 +2,8 @@ package virtualSynchrony;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
@@ -25,7 +27,6 @@ public class VSMain {
 		// actors list
 		List<ActorRef> group = new ArrayList<>();
 		int id=0;
-		//int i=0;
 		
 		// creating and adding GM in actors list
 		group.add(system.actorOf(Participant.props(id), "GM"+ id));
@@ -38,9 +39,11 @@ public class VSMain {
 		}
 		
 		// send the group member list to everyone in the group 
-		JoinGroupMsg join = new JoinGroupMsg(group,0);
 		for (ActorRef peer: group) {
-			peer.tell(join, null);
+			if(!peer.equals(group.get(0))) 
+				peer.tell(new JoinGroupMsg(Collections.unmodifiableList(group),0), null);
+			else 
+				peer.tell(new JoinGroupMsg(group,0), null);
 		}
 		
 		
@@ -51,10 +54,12 @@ public class VSMain {
 	    switch(option) {
 	    case "1" :
 	    	System.out.println("option 1 selected");
-	    	sendStable=true;
+	    	sendStable=true; //also send the stable msg
 	    	for(ActorRef p: group) {
-	    		if(!p.path().name().equals("GM0")) 
+	    		if(!p.path().name().equals("GM0")) {
 	    			p.tell(new StartChatMsg(sendStable), null);
+	    			p.tell(new StartChatMsg(sendStable), null);
+	    		}
 	    	}
 	    	break;
 	    	
@@ -65,10 +70,9 @@ public class VSMain {
 	    	// tell p1 to start chat msg
 	    	group.get(1).tell(new StartChatMsg(sendStable), null);
 	    	// tell GM to install new view after unstable msg received
-	    	Thread.sleep(1000);
 	    	group.get(0).tell(new CreateNewActor(), null);
-	    	Thread.sleep(3000);
-	    	group.get(1).tell(new StartChatMsg(sendStable), null);
+	    	Thread.sleep(200); //GM and actor6 are working in parallel so we add some delay 
+	    	group.get(6).tell(new StartChatMsg(sendStable), null);
 	    	
 	    	break;
 	    	
@@ -77,10 +81,11 @@ public class VSMain {
 	    	System.out.println("option 3 selected");
 	    	sendStable=true;
 	    	group.get(1).tell(new StartChatMsg(sendStable), null);
-	    	Thread.sleep(1000);
+	    	//System.out.println(group.size());
 	    	group.get(0).tell(new ParticipantCrashed(group.get(1)), null);
-	    	Thread.sleep(1000);
-	    	group.get(1).tell(new StartChatMsg(sendStable), null);
+	    	Thread.sleep(200);
+	    	//System.out.println(group.size());
+	    	group.get(2).tell(new StartChatMsg(sendStable), null); 
 	    	break;
 	    	
 	    case "4" :
@@ -94,9 +99,13 @@ public class VSMain {
 	    	//5: crash P2 after receiving multicast
 	    	System.out.println("option 5 selected");
 	    	group.get(2).tell(new CrashAfterReceiveMulticast(true), null);
-	    	Thread.sleep(1000);
 	    	sendStable=true;
-	    	group.get(1).tell(new StartChatMsg(sendStable), null);
+	    	system.scheduler().scheduleOnce(
+	    	          Duration.create(1000, TimeUnit.MILLISECONDS),  
+	    	          group.get(1),
+	    	          new StartChatMsg(sendStable), // the message to send
+	    	          system.dispatcher(), null
+	    	          );
 	    	break;
 	    	
 	    case "6" :
@@ -147,7 +156,7 @@ public class VSMain {
 		System.out.println("3: crash P1 after stable multicast");
 		System.out.println("4: crash P1 after unstable multicast");
 		System.out.println("5: crash P2 after receiving multicast");
-		System.out.println("6: crash P3 after receiving view change msg");
+		System.out.println("6: Create new Actor, crash P3 at view change");
 		System.out.println("SELECT THE OPTION");
 		
 	}

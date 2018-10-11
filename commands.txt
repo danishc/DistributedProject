@@ -42,3 +42,4 @@ heroku config
 
 gradle run
 python3 parse.py text.log
+Rscript check.r
