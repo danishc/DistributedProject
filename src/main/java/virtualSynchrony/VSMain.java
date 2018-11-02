@@ -69,9 +69,9 @@ public class VSMain {
 	    	sendStable=true;
 	    	// tell p1 to start chat msg
 	    	group.get(1).tell(new StartChatMsg(sendStable), null);
-	    	// tell GM to install new view after unstable msg received
+	    	// tell GM to create new actor
 	    	group.get(0).tell(new CreateNewActor(), null);
-	    	Thread.sleep(200); //GM and actor6 are working in parallel so we add some delay 
+	    	Thread.sleep(1050); //this time must be grater than 1000ms as we are using 1000ms as flush timeout
 	    	group.get(6).tell(new StartChatMsg(sendStable), null);
 	    	
 	    	break;
@@ -83,8 +83,7 @@ public class VSMain {
 	    	group.get(1).tell(new StartChatMsg(sendStable), null);
 	    	//System.out.println(group.size());
 	    	group.get(0).tell(new ParticipantCrashed(group.get(1)), null);
-	    	Thread.sleep(200);
-	    	//System.out.println(group.size());
+	    	Thread.sleep(1050); //this time must be grater than 1000ms as we are using 1000ms as flush timeout
 	    	group.get(2).tell(new StartChatMsg(sendStable), null); 
 	    	break;
 	    	
@@ -101,7 +100,7 @@ public class VSMain {
 	    	group.get(2).tell(new CrashAfterReceiveMulticast(true), null);
 	    	sendStable=true;
 	    	system.scheduler().scheduleOnce(
-	    	          Duration.create(1000, TimeUnit.MILLISECONDS),  
+	    	          Duration.create(1050, TimeUnit.MILLISECONDS),  
 	    	          group.get(1),
 	    	          new StartChatMsg(sendStable), // the message to send
 	    	          system.dispatcher(), null
@@ -110,6 +109,7 @@ public class VSMain {
 	    	
 	    case "6" :
 	    	//6: crash P3 after receiving view change msg
+	    	// crashing and adding new participant is happening in the same install view
 	    	System.out.println("option 6 selected");
 	    	group.get(3).tell(new CrashAfterViewChange(true), null);
 	    	system.scheduler().scheduleOnce(
@@ -121,7 +121,7 @@ public class VSMain {
 	    	
 	    	sendStable=true;
 	    	system.scheduler().scheduleOnce(
-	    	          Duration.create(50, TimeUnit.MILLISECONDS),  
+	    	          Duration.create(1050, TimeUnit.MILLISECONDS),  
 	    	          group.get(1),
 	    	          new StartChatMsg(sendStable), // the message to send
 	    	          system.dispatcher(), null

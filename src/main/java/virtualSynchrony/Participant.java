@@ -24,12 +24,12 @@ public class Participant extends AbstractActor {
 	private int sendCount =0;
 	final static int N_MESSAGES = 2;							// max number of msgs an actor can multicast
 	private boolean crashAfterReceiveMulticast=false; 			// for condition number 5
-	private boolean crashAfterViewChange=false;					//check for condition number 6
+	private boolean crashAfterViewChange=false;					// check for condition number 6
 	private List<ActorRef> flushGroup = new ArrayList<>();
 	private List<ChatMsg> buffer =new ArrayList<>();
 	protected boolean crashed = false;          				// simulates a crash
 	private Cancellable timerMulticast;							// stop timer when inhabit_sent equal to zero
-	private int inhibit_sends = 0;								//allow multicast only when equal to zero
+	private int inhibit_sends = 0;								// allow multicast only when equal to zero
 	private int view = 0;										// view installed by current actor
 	  
 	
@@ -192,7 +192,7 @@ public class Participant extends AbstractActor {
 				}
 			}
 			else {
-				System.out.println("inhabit is grater the 1");
+				//System.out.println("inhabit is grater the 1");
 				//wait for inhibit_sends to turn to zero
 				timerMulticast =getContext().system().scheduler().schedule(
 						Duration.create(50, TimeUnit.MILLISECONDS),
@@ -239,18 +239,18 @@ public class Participant extends AbstractActor {
     		this.buffer.clear();
     	}
     	//after time out if there is still someone who did not send the flush
-    	else if(groupSizeDiff==1) {	// some one crashed while sending flush
+    	else if(groupSizeDiff>=1) {	// some one crashed while sending flush
     		List<ActorRef> tmp= new ArrayList<>();
     		tmp.addAll(this.group);
     		tmp.removeAll(this.flushGroup);
  		
-    		if(tmp.size()==1) {
+    		for(int i=0; i<tmp.size(); i++) {
     			getContext().system().scheduler().scheduleOnce(
-  	      	          Duration.create(1000, TimeUnit.MILLISECONDS),  
-  	      	          getSelf(),	//tell GM that p crashed
-  	      	          new ParticipantCrashed(tmp.get(0)), // the message to send
-  	      	          getContext().system().dispatcher(), getSelf()
-  	      	          );
+    	      	          Duration.create(1000, TimeUnit.MILLISECONDS),  
+    	      	          getSelf(),	//tell GM that p crashed
+    	      	          new ParticipantCrashed(tmp.get(i)), // the message to send
+    	      	          getContext().system().dispatcher(), getSelf()
+    	      	          );
     		}
     	}
     }
@@ -276,7 +276,7 @@ public class Participant extends AbstractActor {
 				getContext().system().scheduler().scheduleOnce(
 						Duration.create(1000, TimeUnit.MILLISECONDS),  
 						getSelf(),
-						new FlushTimeout(msg.view+1), // the message to send
+						new FlushTimeout(msg.view+1), // on flush time out it check if it received flush messages from every one
 						getContext().system().dispatcher(), getSelf()
 				);
     		}
@@ -295,6 +295,7 @@ public class Participant extends AbstractActor {
 			          new Timeout(m.senderId), // the message to send
 			          getContext().system().dispatcher(), getSelf()
 			          );
+			//System.out.println(this.id+ " recived uM");
 			
 		}
 		
@@ -392,30 +393,12 @@ public class Participant extends AbstractActor {
 		if(this.id==0) { // make sure that only GM can execute this code
 			//creating new participant
 			ActorRef newP= getContext().system().actorOf(Participant.props(this.group.size()), "participant" +this.group.size());
-//			List<ActorRef> temp = new ArrayList<>();
-//			
-//			temp.addAll(this.group);
-//			temp.add(newP);
-//			newP.tell(new JoinGroupMsg(temp,this.view), getSelf());
-//			
-//			//tell every one to modify there group list
-//			JoinGroupMsg join = new JoinGroupMsg(temp,this.view);
-//			for (ActorRef peer: group) {	
-//				peer.tell(join, getSelf());
-//			}
-//			
-//			//telling GM to install new view
-//			getSelf().tell(new JoinNew(temp), getSelf());
-			this.group.add(newP);
+			this.group.add(newP); //GM updating its group list
 			newP.tell(new JoinGroupMsg(Collections.unmodifiableList(this.group),this.view), getSelf());
-			
-			//telling GM to install new view
-			//getSelf().tell(new JoinNew(this.group), getSelf());
-			
 			
 			//using scheduler so new participant can update its group list before receiving view change request
 			getContext().system().scheduler().scheduleOnce(
-	      	          Duration.create(100, TimeUnit.MILLISECONDS),  
+	      	          Duration.create(500, TimeUnit.MILLISECONDS),  
 	      	          getSelf(),	
 	      	          new JoinNew(), // the message to send
 	      	          getContext().system().dispatcher(), getSelf()
