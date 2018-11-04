@@ -9,18 +9,18 @@ option 3 selected
 1 send multicast m1 within 0
 >>> Wait for the chats to stop and press ENTER <<<
 4 deliver multicast m1 from 1 within 0
-0 deliver multicast m1 from 1 within 0
+3 deliver multicast m1 from 1 within 0
 5 deliver multicast m1 from 1 within 0
 2 deliver multicast m1 from 1 within 0
-3 deliver multicast m1 from 1 within 0
-0 install view 1 0,2,3,4,5
-5 install view 1 0,2,3,4,5
+0 deliver multicast m1 from 1 within 0
 2 install view 1 0,2,3,4,5
 3 install view 1 0,2,3,4,5
 4 install view 1 0,2,3,4,5
+5 install view 1 0,2,3,4,5
+0 install view 1 0,2,3,4,5
 2 send multicast m1 within 1
-0 deliver multicast m1 from 2 within 1
 3 deliver multicast m1 from 2 within 1
 4 deliver multicast m1 from 2 within 1
+0 deliver multicast m1 from 2 within 1
 5 deliver multicast m1 from 2 within 1
 >>> Press ENTER to exit <<<

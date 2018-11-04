@@ -72,7 +72,7 @@ public class VSMain {
 	    	//this time must be grater than 300ms as we are using 200ms for unstable timeout and 10ms for each msg
 	    	// tell GM to create new actor
 	    	system.scheduler().scheduleOnce(
-	    	          Duration.create(310, TimeUnit.MILLISECONDS),  
+	    	          Duration.create(350, TimeUnit.MILLISECONDS),  
 	    	          group.get(0),
 	    	          new CreateNewActor(), // the message to send
 	    	          system.dispatcher(), null
@@ -80,7 +80,7 @@ public class VSMain {
 	    	
 	    	//this time must be grater than 1500ms as we are using 1500ms as flush timeout
 	    	system.scheduler().scheduleOnce(
-	    	          Duration.create(1820, TimeUnit.MILLISECONDS),  
+	    	          Duration.create(1900, TimeUnit.MILLISECONDS),  
 	    	          group.get(2),
 	    	          new StartChatMsg(sendStable), // the message to send
 	    	          system.dispatcher(), null
@@ -95,14 +95,14 @@ public class VSMain {
 	    	group.get(1).tell(new StartChatMsg(sendStable), null);
 	    	//System.out.println(group.size());
 	    	system.scheduler().scheduleOnce(
-	    	          Duration.create(310, TimeUnit.MILLISECONDS),  
+	    	          Duration.create(350, TimeUnit.MILLISECONDS),  
 	    	          group.get(0),
 	    	          new ParticipantCrashed(group.get(1)), // the message to send
 	    	          system.dispatcher(), null
 	    	          );
 	    	//this time must be grater than 1500ms as we are using 1500ms as flush timeout
 	    	system.scheduler().scheduleOnce(
-	    	          Duration.create(1820, TimeUnit.MILLISECONDS),  
+	    	          Duration.create(1900, TimeUnit.MILLISECONDS),  
 	    	          group.get(2),
 	    	          new StartChatMsg(sendStable), // the message to send
 	    	          system.dispatcher(), null
@@ -143,7 +143,7 @@ public class VSMain {
 	    	
 	    	sendStable=true;
 	    	system.scheduler().scheduleOnce(
-	    	          Duration.create(1520, TimeUnit.MILLISECONDS),  
+	    	          Duration.create(1550, TimeUnit.MILLISECONDS),  
 	    	          group.get(1),
 	    	          new StartChatMsg(sendStable), // the message to send
 	    	          system.dispatcher(), null
