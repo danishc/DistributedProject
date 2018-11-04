@@ -78,9 +78,9 @@ public class VSMain {
 	    	          system.dispatcher(), null
 	    	          );
 	    	
-	    	//this time must be grater than 1000ms as we are using 1000ms as flush timeout plus 500ms for newP
+	    	//550ms as flush timeout + 150ms for newP + 350ms for CNA
 	    	system.scheduler().scheduleOnce(
-	    	          Duration.create(1950, TimeUnit.MILLISECONDS),  
+	    	          Duration.create(1050, TimeUnit.MILLISECONDS),  
 	    	          group.get(2),
 	    	          new StartChatMsg(sendStable), // the message to send
 	    	          system.dispatcher(), null
@@ -100,7 +100,7 @@ public class VSMain {
 	    	          new ParticipantCrashed(group.get(1)), // the message to send
 	    	          system.dispatcher(), null
 	    	          );
-	    	//this time must be grater than 1500ms as we are using 1500ms as flush timeout
+	    	//1550ms + 350ms
 	    	system.scheduler().scheduleOnce(
 	    	          Duration.create(1900, TimeUnit.MILLISECONDS),  
 	    	          group.get(2),
@@ -143,7 +143,7 @@ public class VSMain {
 	    	
 	    	sendStable=true;
 	    	system.scheduler().scheduleOnce(
-	    	          Duration.create(1950, TimeUnit.MILLISECONDS),  
+	    	          Duration.create(750, TimeUnit.MILLISECONDS),  
 	    	          group.get(1),
 	    	          new StartChatMsg(sendStable), // the message to send
 	    	          system.dispatcher(), null
