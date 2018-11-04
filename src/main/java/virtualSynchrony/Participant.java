@@ -274,7 +274,7 @@ public class Participant extends AbstractActor {
 			ChatMsg m= new ChatMsg(0,this.id,false,true,msg.view);
 			if(multicast(m,this.group))		{	//wait for multicast to complete
 				getContext().system().scheduler().scheduleOnce(
-						Duration.create(1000, TimeUnit.MILLISECONDS),  
+						Duration.create(1500, TimeUnit.MILLISECONDS),  
 						getSelf(),
 						new FlushTimeout(msg.view+1), // on flush time out it check if it received flush messages from every one
 						getContext().system().dispatcher(), getSelf()

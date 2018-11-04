@@ -5,18 +5,26 @@
 5: crash P2 after receiving multicast
 6: Create new Actor, crash P3 at view change
 SELECT THE OPTION
-option 6 selected
+option 2 selected
+1 send multicast m1 within 0
 >>> Wait for the chats to stop and press ENTER <<<
-6 install view 1 0,1,2,4,5,6
-2 install view 1 0,1,2,4,5,6
-5 install view 1 0,1,2,4,5,6
-0 install view 1 0,1,2,4,5,6
-4 install view 1 0,1,2,4,5,6
-1 install view 1 0,1,2,4,5,6
-1 send multicast m1 within 1
-0 deliver multicast m1 from 1 within 1
-4 deliver multicast m1 from 1 within 1
-5 deliver multicast m1 from 1 within 1
-2 deliver multicast m1 from 1 within 1
-6 deliver multicast m1 from 1 within 1
+4 deliver multicast m1 from 1 within 0
+2 deliver multicast m1 from 1 within 0
+0 deliver multicast m1 from 1 within 0
+3 deliver multicast m1 from 1 within 0
+5 deliver multicast m1 from 1 within 0
+4 install view 1 0,1,2,3,4,5,6
+6 install view 1 0,1,2,3,4,5,6
+5 install view 1 0,1,2,3,4,5,6
+2 install view 1 0,1,2,3,4,5,6
+3 install view 1 0,1,2,3,4,5,6
+0 install view 1 0,1,2,3,4,5,6
+1 install view 1 0,1,2,3,4,5,6
+2 send multicast m1 within 1
+3 deliver multicast m1 from 2 within 1
+6 deliver multicast m1 from 2 within 1
+5 deliver multicast m1 from 2 within 1
+1 deliver multicast m1 from 2 within 1
+0 deliver multicast m1 from 2 within 1
+4 deliver multicast m1 from 2 within 1
 >>> Press ENTER to exit <<<

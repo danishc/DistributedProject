@@ -69,10 +69,22 @@ public class VSMain {
 	    	sendStable=true;
 	    	// tell p1 to start chat msg
 	    	group.get(1).tell(new StartChatMsg(sendStable), null);
+	    	//this time must be grater than 300ms as we are using 200ms for unstable timeout and 10ms for each msg
 	    	// tell GM to create new actor
-	    	group.get(0).tell(new CreateNewActor(), null);
-	    	Thread.sleep(1050); //this time must be grater than 1000ms as we are using 1000ms as flush timeout
-	    	group.get(6).tell(new StartChatMsg(sendStable), null);
+	    	system.scheduler().scheduleOnce(
+	    	          Duration.create(310, TimeUnit.MILLISECONDS),  
+	    	          group.get(0),
+	    	          new CreateNewActor(), // the message to send
+	    	          system.dispatcher(), null
+	    	          );
+	    	
+	    	//this time must be grater than 1500ms as we are using 1500ms as flush timeout
+	    	system.scheduler().scheduleOnce(
+	    	          Duration.create(1550, TimeUnit.MILLISECONDS),  
+	    	          group.get(2),
+	    	          new StartChatMsg(sendStable), // the message to send
+	    	          system.dispatcher(), null
+	    	          );
 	    	
 	    	break;
 	    	
@@ -82,9 +94,19 @@ public class VSMain {
 	    	sendStable=true;
 	    	group.get(1).tell(new StartChatMsg(sendStable), null);
 	    	//System.out.println(group.size());
-	    	group.get(0).tell(new ParticipantCrashed(group.get(1)), null);
-	    	Thread.sleep(1050); //this time must be grater than 1000ms as we are using 1000ms as flush timeout
-	    	group.get(2).tell(new StartChatMsg(sendStable), null); 
+	    	system.scheduler().scheduleOnce(
+	    	          Duration.create(310, TimeUnit.MILLISECONDS),  
+	    	          group.get(0),
+	    	          new ParticipantCrashed(group.get(1)), // the message to send
+	    	          system.dispatcher(), null
+	    	          );
+	    	//this time must be grater than 1500ms as we are using 1500ms as flush timeout
+	    	system.scheduler().scheduleOnce(
+	    	          Duration.create(1550, TimeUnit.MILLISECONDS),  
+	    	          group.get(2),
+	    	          new StartChatMsg(sendStable), // the message to send
+	    	          system.dispatcher(), null
+	    	          );
 	    	break;
 	    	
 	    case "4" :
@@ -100,7 +122,7 @@ public class VSMain {
 	    	group.get(2).tell(new CrashAfterReceiveMulticast(true), null);
 	    	sendStable=true;
 	    	system.scheduler().scheduleOnce(
-	    	          Duration.create(1050, TimeUnit.MILLISECONDS),  
+	    	          Duration.create(1550, TimeUnit.MILLISECONDS),  
 	    	          group.get(1),
 	    	          new StartChatMsg(sendStable), // the message to send
 	    	          system.dispatcher(), null
@@ -121,7 +143,7 @@ public class VSMain {
 	    	
 	    	sendStable=true;
 	    	system.scheduler().scheduleOnce(
-	    	          Duration.create(1050, TimeUnit.MILLISECONDS),  
+	    	          Duration.create(1550, TimeUnit.MILLISECONDS),  
 	    	          group.get(1),
 	    	          new StartChatMsg(sendStable), // the message to send
 	    	          system.dispatcher(), null
