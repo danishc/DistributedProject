@@ -80,7 +80,7 @@ public class VSMain {
 	    	
 	    	//this time must be grater than 1500ms as we are using 1500ms as flush timeout
 	    	system.scheduler().scheduleOnce(
-	    	          Duration.create(1550, TimeUnit.MILLISECONDS),  
+	    	          Duration.create(1820, TimeUnit.MILLISECONDS),  
 	    	          group.get(2),
 	    	          new StartChatMsg(sendStable), // the message to send
 	    	          system.dispatcher(), null
@@ -102,7 +102,7 @@ public class VSMain {
 	    	          );
 	    	//this time must be grater than 1500ms as we are using 1500ms as flush timeout
 	    	system.scheduler().scheduleOnce(
-	    	          Duration.create(1550, TimeUnit.MILLISECONDS),  
+	    	          Duration.create(1820, TimeUnit.MILLISECONDS),  
 	    	          group.get(2),
 	    	          new StartChatMsg(sendStable), // the message to send
 	    	          system.dispatcher(), null
@@ -122,7 +122,7 @@ public class VSMain {
 	    	group.get(2).tell(new CrashAfterReceiveMulticast(true), null);
 	    	sendStable=true;
 	    	system.scheduler().scheduleOnce(
-	    	          Duration.create(1550, TimeUnit.MILLISECONDS),  
+	    	          Duration.create(10, TimeUnit.MILLISECONDS),  
 	    	          group.get(1),
 	    	          new StartChatMsg(sendStable), // the message to send
 	    	          system.dispatcher(), null
@@ -143,7 +143,7 @@ public class VSMain {
 	    	
 	    	sendStable=true;
 	    	system.scheduler().scheduleOnce(
-	    	          Duration.create(1550, TimeUnit.MILLISECONDS),  
+	    	          Duration.create(1520, TimeUnit.MILLISECONDS),  
 	    	          group.get(1),
 	    	          new StartChatMsg(sendStable), // the message to send
 	    	          system.dispatcher(), null
