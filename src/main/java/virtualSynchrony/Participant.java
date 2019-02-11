@@ -22,7 +22,7 @@ public class Participant extends AbstractActor {
 	private List<ActorRef> group;
 	private Random rnd = new Random();
 	private int sendCount =0;
-	final static int N_MESSAGES = 2;							// max number of msgs an actor can multicast
+	final static int N_MESSAGES = 100;							// max number of msgs an actor can multicast
 	private boolean crashAfterReceiveMulticast=false; 			// for condition number 5
 	private boolean crashAfterViewChange=false;					// check for condition number 6
 	private List<ActorRef> flushGroup = new ArrayList<>();
