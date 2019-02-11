@@ -3,6 +3,7 @@ import re
 
 log = sys.argv[1]
 
+
 S = re.compile("(?P<src>\d+) send multicast (?P<seqn>[\w-]+) within (?P<epoch>\d+)")
 R = re.compile("(?P<dst>\d+) deliver multicast (?P<seqn>[\w-]+) from (?P<src>\d+) within (?P<epoch>\d+)")
 V = re.compile("(?P<id>\d+) install view (?P<epoch>\d+) (?P<group>.+)")
